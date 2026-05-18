@@ -11,9 +11,14 @@ function formatDuration(seconds) {
 function registerUptimeCommand(bot) {
   bot.command('uptime', async (ctx) => {
     try {
-      const uptimeSeconds = await si.time().then((t) => t.uptime);
-      await ctx.reply(`⏱️ Uptime server: *${formatDuration(uptimeSeconds)}*`, {
-        parse_mode: 'Markdown',
+      // si.time() may be synchronous in some versions of systeminformation.
+      // Support both synchronous return and Promise return without using .then().
+      const timeResult = si.time();
+      const resolved = typeof timeResult?.then === 'function' ? await timeResult : timeResult;
+      const uptimeSeconds = (resolved && typeof resolved.uptime === 'number') ? resolved.uptime : 0;
+
+      await ctx.reply(`⏱️ Uptime server: <b>${formatDuration(uptimeSeconds)}</b>`, {
+        parse_mode: 'HTML',
       });
     } catch (error) {
       console.error('[UPTIME_COMMAND_ERROR]', error);
