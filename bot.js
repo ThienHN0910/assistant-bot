@@ -23,7 +23,13 @@ async function startBot() {
     registerStatusCommand(bot);
     registerIpCommand(bot);
     registerLogsCommand(bot, config);
-    registerUptimeCommand(bot);
+
+    // Guard against missing or invalid exports from command modules
+    if (typeof registerUptimeCommand === 'function') {
+      registerUptimeCommand(bot);
+    } else {
+      console.error('[BOT_STARTUP_WARN] registerUptimeCommand is not available or not a function');
+    }
 
     // Xử lý text thường (snippet ghi chú).
     bot.on('text', createTextHandler(config));
