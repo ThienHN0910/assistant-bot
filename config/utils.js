@@ -1,9 +1,14 @@
 const fs = require('fs/promises');
 
 function escapeMarkdown(value) {
-  return String(value)
-    .replace(/\\/g, '\\\\')
-    .replace(/([_\-*\[\]()~`>#+=|{}.!])/g, '\\$1');
+  const markdownSpecialChars = [
+    '\\', '_', '*', '[', ']', '(', ')', '~', '`',
+    '>', '#', '+', '-', '=', '|', '{', '}', '.', '!',
+  ];
+
+  return markdownSpecialChars.reduce((escapedText, specialChar) => {
+    return escapedText.replaceAll(specialChar, `\\${specialChar}`);
+  }, String(value));
 }
 
 async function readLastLines(filePath, lineCount = 20) {
