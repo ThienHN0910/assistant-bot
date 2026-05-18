@@ -1,17 +1,5 @@
 const fs = require('fs/promises');
 
-function escapeMarkdown(value) {
-  const markdownSpecialChars = [
-    '_', '*', '[', ']', '(', ')', '~', '`',
-    '>', '#', '+', '-', '=', '|', '{', '}', '.', '!',
-  ];
-
-  const escapedBackslash = String(value).split('\\').join('\\\\');
-  return markdownSpecialChars.reduce((escapedText, specialChar) => {
-    return escapedText.replaceAll(specialChar, `\\${specialChar}`);
-  }, escapedBackslash);
-}
-
 async function readLastLines(filePath, lineCount = 20) {
   const content = await fs.readFile(filePath, 'utf8');
   const lines = content.split(/\r?\n/);
@@ -32,7 +20,6 @@ function formatPercent(value) {
 }
 
 module.exports = {
-  escapeMarkdown,
   readLastLines,
   formatBytes,
   formatPercent,

@@ -1,5 +1,11 @@
 const axios = require('axios');
-const { escapeMarkdown } = require('../config/utils');
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 function registerIpCommand(bot) {
   bot.command('ip', async (ctx) => {
@@ -13,8 +19,8 @@ function registerIpCommand(bot) {
         throw new Error('Không nhận được địa chỉ IP từ API');
       }
 
-      await ctx.reply(`🌐 *IP Public hiện tại:* \`${escapeMarkdown(ip)}\``, {
-        parse_mode: 'MarkdownV2',
+      await ctx.reply(`🌐 <b>IP Public hiện tại:</b> <code>${escapeHtml(ip)}</code>`, {
+        parse_mode: 'HTML',
       });
     } catch (error) {
       console.error('[IP_COMMAND_ERROR]', error.message || error);

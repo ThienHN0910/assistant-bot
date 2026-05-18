@@ -182,18 +182,6 @@ module.exports = { createAuthMiddleware };
 ```js
 const fs = require('fs/promises');
 
-function escapeMarkdown(value) {
-  const markdownSpecialChars = [
-    '_', '*', '[', ']', '(', ')', '~', '`',
-    '>', '#', '+', '-', '=', '|', '{', '}', '.', '!',
-  ];
-
-  const escapedBackslash = String(value).split('\\\\').join('\\\\\\\\');
-  return markdownSpecialChars.reduce((escapedText, specialChar) => {
-    return escapedText.replaceAll(specialChar, `\\\\${specialChar}`);
-  }, escapedBackslash);
-}
-
 async function readLastLines(filePath, lineCount = 20) {
   const content = await fs.readFile(filePath, 'utf8');
   const lines = content.split(/\r?\n/);
@@ -214,7 +202,6 @@ function formatPercent(value) {
 }
 
 module.exports = {
-  escapeMarkdown,
   readLastLines,
   formatBytes,
   formatPercent,
@@ -300,7 +287,13 @@ module.exports = { registerStatusCommand };
 
 ```js
 const axios = require('axios');
-const { escapeMarkdown } = require('../config/utils');
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 function registerIpCommand(bot) {
   bot.command('ip', async (ctx) => {
@@ -314,8 +307,8 @@ function registerIpCommand(bot) {
         throw new Error('Không nhận được địa chỉ IP từ API');
       }
 
-      await ctx.reply(`🌐 *IP Public hiện tại:* \`${escapeMarkdown(ip)}\``, {
-        parse_mode: 'MarkdownV2',
+      await ctx.reply(`🌐 <b>IP Public hiện tại:</b> <code>${escapeHtml(ip)}</code>`, {
+        parse_mode: 'HTML',
       });
     } catch (error) {
       console.error('[IP_COMMAND_ERROR]', error.message || error);
