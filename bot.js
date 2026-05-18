@@ -1,12 +1,12 @@
-const { Telegraf } = require('telegraf');
-const { getConfig } = require('./config/env');
-const { createAuthMiddleware } = require('./config/middleware');
-const startCommand = require('./commands/start');
-const statusCommand = require('./commands/status');
-const ipCommand = require('./commands/ip');
-const logsCommand = require('./commands/logs');
-const uptimeCommand = require('./commands/uptime');
-const { createTextHandler } = require('./handlers/textHandler');
+const { Telegraf } = require("telegraf");
+const { getConfig } = require("./config/env");
+const { createAuthMiddleware } = require("./config/middleware");
+const startCommand = require("./commands/start");
+const statusCommand = require("./commands/status");
+const ipCommand = require("./commands/ip");
+const logsCommand = require("./commands/logs");
+const uptimeCommand = require("./commands/uptime");
+const { createTextHandler } = require("./handlers/textHandler");
 
 let bot;
 
@@ -19,78 +19,89 @@ async function startBot() {
     bot.use(createAuthMiddleware(config));
 
     // Đăng ký command handler theo mô-đun xuất ra object { name, execute }
-    const modules = [startCommand, statusCommand, ipCommand, logsCommand, uptimeCommand];
+    const modules = [
+      startCommand,
+      statusCommand,
+      ipCommand,
+      logsCommand,
+      uptimeCommand,
+    ];
 
     for (const mod of modules) {
       if (!mod) continue;
 
-      // Old-style function export (backwards compatibility)
-      if (typeof mod === 'function') {
+      // ÉP BUỘC CHẠY THEO CHUẨN OBJECT MỚI { name, execute }
+      if (mod.name && typeof mod.execute === "function") {
         try {
-          mod(bot, config);
+          // Fix truyền tham số: Truyền config độc lập để các file như logs.js đọc được pm2ErrorLogPath
+          bot.command(mod.name, (ctx) => mod.execute(ctx, config));
+          console.log(`📡 Đã nạp thành công lệnh: /${mod.name}`);
         } catch (err) {
-          console.error('[BOT_MODULE_REGISTER_ERROR]', err);
+          console.error(
+            `[BOT_MODULE_COMMAND_ERROR] Lỗi tại lệnh /${mod.name}:`,
+            err,
+          );
         }
         continue;
       }
 
-      // New-style object export: { name, execute }
-      if (typeof mod.name === 'string' && typeof mod.execute === 'function') {
-        try {
-          bot.command(mod.name, (ctx) => mod.execute(ctx, { bot, config }));
-        } catch (err) {
-          console.error('[BOT_MODULE_COMMAND_ERROR]', err);
-        }
+      // Nếu phát hiện file nào cứng đầu chưa chuyển sang Object
+      if (typeof mod === "function") {
+        console.error(
+          `[BOT_MODULE_ERROR] Phát hiện file lệnh viết dạng function cũ! Hãy chuyển sang Object { name, execute }.`,
+        );
         continue;
       }
 
-      console.warn('[BOT_MODULE_WARN] Unknown module format', mod && mod.name);
+      console.warn(
+        "[BOT_MODULE_WARN] Sai định dạng file lệnh:",
+        mod && mod.name,
+      );
     }
 
     // Xử lý text thường (snippet ghi chú).
-    bot.on('text', createTextHandler(config));
+    bot.on("text", createTextHandler(config));
 
     bot.catch((error) => {
-      console.error('[BOT_RUNTIME_ERROR]', error);
+      console.error("[BOT_RUNTIME_ERROR]", error);
     });
 
     await bot.launch();
-    console.log('✅ Dev Assistant Bot đang chạy...');
+    console.log("✅ Dev Assistant Bot đang chạy mượt mà...");
   } catch (error) {
-    console.error('[BOT_STARTUP_ERROR]', error);
+    console.error("[BOT_STARTUP_ERROR]", error);
     process.exitCode = 1;
   }
 }
-
 async function gracefulShutdown(signal) {
   try {
     console.log(`⏳ Nhận tín hiệu ${signal}, đang tắt bot an toàn...`);
     if (bot) {
       await bot.stop(signal);
     }
-    console.log('🛑 Bot đã dừng an toàn.');
+    console.log("🛑 Bot đã dừng an toàn.");
   } catch (error) {
-    console.error('[BOT_SHUTDOWN_ERROR]', error);
+    console.error("[BOT_SHUTDOWN_ERROR]", error);
   } finally {
     process.exit(0);
   }
 }
 
-process.once('SIGINT', () => {
-  gracefulShutdown('SIGINT').catch((error) => {
-    console.error('[SIGINT_SHUTDOWN_ERROR]', error);
+process.once("SIGINT", () => {
+  gracefulShutdown("SIGINT").catch((error) => {
+    console.error("[SIGINT_SHUTDOWN_ERROR]", error);
     process.exit(1);
   });
 });
 
-process.once('SIGTERM', () => {
-  gracefulShutdown('SIGTERM').catch((error) => {
-    console.error('[SIGTERM_SHUTDOWN_ERROR]', error);
+process.once("SIGTERM", () => {
+  gracefulShutdown("SIGTERM").catch((error) => {
+    console.error("[SIGTERM_SHUTDOWN_ERROR]", error);
     process.exit(1);
   });
 });
 
 startBot().catch((error) => {
-  console.error('[BOT_FATAL_ERROR]', error);
+  console.error("[BOT_FATAL_ERROR]", error);
   process.exit(1);
 });

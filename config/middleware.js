@@ -2,19 +2,18 @@ function createAuthMiddleware(config) {
   return async (ctx, next) => {
     try {
       const senderId = ctx.from?.id;
-      if (senderId !== config.authorizedTelegramId) {
+      
+      // FIX lỗi ép kiểu: Chuyển senderId thành String để so sánh chuẩn xác với .env
+      if (String(senderId) !== String(config.authorizedTelegramId)) {
         const deniedMessage =
           '🚫 <b>Cảnh báo bảo mật</b>\n\n' +
           'Bạn không có quyền sử dụng bot này.';
 
-        // Chỉ trả lời khi có khả năng phản hồi tin nhắn.
         if (typeof ctx.reply === 'function') {
           await ctx.reply(deniedMessage, { parse_mode: 'HTML' });
         }
 
-        console.warn(
-          `[SECURITY] Từ chối truy cập từ Telegram ID: ${senderId ?? 'unknown'}`
-        );
+        console.warn(`[SECURITY] Từ chối truy cập từ Telegram ID: ${senderId ?? 'unknown'}`);
         return;
       }
 
@@ -22,13 +21,8 @@ function createAuthMiddleware(config) {
     } catch (error) {
       console.error('[AUTH_MIDDLEWARE_ERROR]', error);
       if (typeof ctx.reply === 'function') {
-        await ctx
-          .reply('⚠️ Có lỗi khi kiểm tra quyền truy cập.', {
-            parse_mode: 'HTML',
-          })
-          .catch((replyError) => {
-            console.error('[AUTH_MIDDLEWARE_REPLY_ERROR]', replyError);
-          });
+        await ctx.reply('⚠️ Có lỗi khi kiểm tra quyền truy cập.', { parse_mode: 'HTML' })
+          .catch((replyError) => console.error('[AUTH_MIDDLEWARE_REPLY_ERROR]', replyError));
       }
     }
   };

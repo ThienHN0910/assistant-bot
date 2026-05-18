@@ -1,38 +1,38 @@
-// Export object form: { name, description, execute }
-function escapeMarkdown(text) {
-  if (text === undefined || text === null) return '';
-  return String(text)
-    .replace(/\\/g, '\\\\')
-    .replace(/[_\[\]\(\)~>#+=\-\|{}\.!]/g, '\\$&');
-}
-
 module.exports = {
   name: 'start',
   description: 'Hiển thị menu hướng dẫn',
   execute: async (ctx) => {
     try {
       const lines = [];
-      lines.push('*' + 'Chào mừng đến với Dev Assistant Bot' + '*');
-      lines.push('🤖 ' + escapeMarkdown('Bot trợ lý cá nhân dành cho lập trình viên'));
+      // Sử dụng thẻ <b> để in đậm trong chế độ HTML
+      lines.push('<b>👋 Chào mừng đến với Dev Assistant Bot</b>');
+      lines.push('🤖 Bot trợ lý cá nhân dành cho lập trình viên!');
       lines.push('');
-      lines.push('*' + 'Danh sách lệnh:' + '*');
-      lines.push(escapeMarkdown('/start') + ' - ' + escapeMarkdown('Hiển thị menu hướng dẫn'));
-      lines.push(escapeMarkdown('/status') + ' - ' + escapeMarkdown('Xem tài nguyên server realtime'));
-      lines.push(escapeMarkdown('/ip') + ' - ' + escapeMarkdown('Lấy IP public hiện tại'));
-      lines.push(escapeMarkdown('/logs') + ' - ' + escapeMarkdown('Xem 20 dòng log lỗi PM2 gần nhất'));
-      lines.push(escapeMarkdown('/uptime') + ' - ' + escapeMarkdown('Xem thời gian uptime của server'));
+      lines.push('<b>📋 Danh sách lệnh:</b>');
+      lines.push('• /start - Hiển thị menu hướng dẫn');
+      lines.push('• /status - Xem tài nguyên server realtime');
+      lines.push('• /ip - Lấy IP public hiện tại');
+      lines.push('• /logs - Xem 20 dòng log lỗi PM2 gần nhất');
+      lines.push('• /uptime - Xem thời gian uptime của server');
       lines.push('');
-      lines.push(escapeMarkdown('Gửi text thường (không bắt đầu bằng /) để lưu vào notes.txt.'));
+      // Dùng thẻ <code> để chữ notes.txt nhìn giống code block Monospace đẹp mắt
+      lines.push('<b>📝 Snippet ghi chú:</b>');
+      lines.push('Gửi text thường (không bắt đầu bằng /) để lưu vào <code>notes.txt</code>.');
 
       const options = {
-        parse_mode: 'MarkdownV2',
+        // Đổi tùy chọn gửi tin nhắn sang HTML
+        parse_mode: 'HTML',
         reply_markup: {
-          keyboard: [['/status', '/ip'], ['/logs', '/uptime']],
+          keyboard: [
+            [{ text: '/status' }, { text: '/ip' }],
+            [{ text: '/logs' }, { text: '/uptime' }]
+          ],
           resize_keyboard: true,
           one_time_keyboard: false,
         },
       };
 
+      // Gửi tin nhắn đồng bộ theo tùy chọn HTML
       await ctx.reply(lines.join('\n'), options);
     } catch (err) {
       console.error('[START_COMMAND_ERROR]', err);
