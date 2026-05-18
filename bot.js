@@ -1,11 +1,11 @@
 const { Telegraf } = require('telegraf');
 const { getConfig } = require('./config/env');
 const { createAuthMiddleware } = require('./config/middleware');
-const { registerStartCommand } = require('./commands/start');
-const { registerStatusCommand } = require('./commands/status');
-const { registerIpCommand } = require('./commands/ip');
-const { registerLogsCommand } = require('./commands/logs');
-const { registerUptimeCommand } = require('./commands/uptime');
+const startCommand = require('./commands/start');
+const statusCommand = require('./commands/status');
+const ipCommand = require('./commands/ip');
+const logsCommand = require('./commands/logs');
+const uptimeCommand = require('./commands/uptime');
 const { createTextHandler } = require('./handlers/textHandler');
 
 let bot;
@@ -18,17 +18,33 @@ async function startBot() {
     // Middleware bảo mật: chỉ cho phép 1 Telegram ID đã cấu hình.
     bot.use(createAuthMiddleware(config));
 
-    // Đăng ký command handler theo từng module riêng.
-    registerStartCommand(bot);
-    registerStatusCommand(bot);
-    registerIpCommand(bot);
-    registerLogsCommand(bot, config);
+    // Đăng ký command handler theo mô-đun xuất ra object { name, execute }
+    const modules = [startCommand, statusCommand, ipCommand, logsCommand, uptimeCommand];
 
-    // Guard against missing or invalid exports from command modules
-    if (typeof registerUptimeCommand === 'function') {
-      registerUptimeCommand(bot);
-    } else {
-      console.error('[BOT_STARTUP_WARN] registerUptimeCommand is not available or not a function');
+    for (const mod of modules) {
+      if (!mod) continue;
+
+      // Old-style function export (backwards compatibility)
+      if (typeof mod === 'function') {
+        try {
+          mod(bot, config);
+        } catch (err) {
+          console.error('[BOT_MODULE_REGISTER_ERROR]', err);
+        }
+        continue;
+      }
+
+      // New-style object export: { name, execute }
+      if (typeof mod.name === 'string' && typeof mod.execute === 'function') {
+        try {
+          bot.command(mod.name, (ctx) => mod.execute(ctx, { bot, config }));
+        } catch (err) {
+          console.error('[BOT_MODULE_COMMAND_ERROR]', err);
+        }
+        continue;
+      }
+
+      console.warn('[BOT_MODULE_WARN] Unknown module format', mod && mod.name);
     }
 
     // Xử lý text thường (snippet ghi chú).
