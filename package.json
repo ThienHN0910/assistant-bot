@@ -1,0 +1,24 @@
+{
+  "name": "assistant-bot",
+  "version": "1.0.0",
+  "description": "Telegram Dev Assistant Bot",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "node bot.js"
+  },
+  "keywords": [
+    "telegram",
+    "telegraf",
+    "bot",
+    "dev-assistant"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "latest",
+    "dotenv": "latest",
+    "systeminformation": "latest",
+    "telegraf": "latest"
+  }
+}
