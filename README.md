@@ -184,13 +184,14 @@ const fs = require('fs/promises');
 
 function escapeMarkdown(value) {
   const markdownSpecialChars = [
-    '\\\\', '_', '*', '[', ']', '(', ')', '~', '`',
+    '_', '*', '[', ']', '(', ')', '~', '`',
     '>', '#', '+', '-', '=', '|', '{', '}', '.', '!',
   ];
 
+  const escapedBackslash = String(value).replace(/\\\\/g, '\\\\\\\\');
   return markdownSpecialChars.reduce((escapedText, specialChar) => {
     return escapedText.replaceAll(specialChar, `\\\\${specialChar}`);
-  }, String(value));
+  }, escapedBackslash);
 }
 
 async function readLastLines(filePath, lineCount = 20) {
