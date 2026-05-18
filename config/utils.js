@@ -1,12 +1,15 @@
 const fs = require('fs/promises');
 
 function escapeMarkdown(value) {
-  return String(value).replace(/([_\-*\[\]()~`>#+=|{}.!])/g, '\\$1');
+  return String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/([_\-*\[\]()~`>#+=|{}.!])/g, '\\$1');
 }
 
 async function readLastLines(filePath, lineCount = 20) {
   const content = await fs.readFile(filePath, 'utf8');
   const lines = content.split(/\r?\n/);
+  // Loại bỏ dòng rỗng ở cuối file để đảm bảo trả về đúng số dòng log thực tế.
   while (lines.length && lines[lines.length - 1] === '') {
     lines.pop();
   }

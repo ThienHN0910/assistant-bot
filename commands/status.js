@@ -10,7 +10,7 @@ function registerStatusCommand(bot) {
         si.fsSize(),
       ]);
 
-      const rootDisk = fileSystems.find((item) => item.mount === '/') || fileSystems[0];
+      const rootDisk = fileSystems.find((item) => item.mount === '/') || fileSystems[0] || { available: 0 };
 
       const cpuUsage = cpuLoad.currentLoad;
       const ramUsagePercent = (memory.used / memory.total) * 100;
@@ -23,7 +23,7 @@ function registerStatusCommand(bot) {
         `• CPU: *${formatPercent(cpuUsage)}*${cpuWarn}`,
         `• RAM: *${formatBytes(memory.used)} / ${formatBytes(memory.total)}* \(${formatPercent(ramUsagePercent)}\)${ramWarn}`,
         `• SWAP: *${formatBytes(memory.swapused)} / ${formatBytes(memory.swaptotal)}*`,
-        `• Disk / còn trống: *${formatBytes(rootDisk?.available ?? 0)}*`,
+        `• Disk / còn trống: *${formatBytes(rootDisk.available)}*`,
       ].join('\n');
 
       await ctx.reply(report, { parse_mode: 'MarkdownV2' });

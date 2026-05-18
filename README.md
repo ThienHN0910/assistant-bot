@@ -49,10 +49,10 @@ assistant-bot/
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "axios": "latest",
-    "dotenv": "latest",
-    "systeminformation": "latest",
-    "telegraf": "latest"
+    "axios": "^1.16.1",
+    "dotenv": "^17.4.2",
+    "systeminformation": "^5.31.6",
+    "telegraf": "^4.16.3"
   }
 }
 ```
@@ -183,12 +183,18 @@ module.exports = { createAuthMiddleware };
 const fs = require('fs/promises');
 
 function escapeMarkdown(value) {
-  return String(value).replace(/([_\-*\[\]()~`>#+=|{}.!])/g, '\\$1');
+  return String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/([_\-*\[\]()~`>#+=|{}.!])/g, '\\$1');
 }
 
 async function readLastLines(filePath, lineCount = 20) {
   const content = await fs.readFile(filePath, 'utf8');
   const lines = content.split(/\r?\n/);
+  // Loại bỏ dòng rỗng ở cuối file để đảm bảo trả về đúng số dòng log thực tế.
+  while (lines.length && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
   return lines.slice(-lineCount).join('\n');
 }
 
@@ -257,7 +263,7 @@ function registerStatusCommand(bot) {
         si.fsSize(),
       ]);
 
-      const rootDisk = fileSystems.find((item) => item.mount === '/') || fileSystems[0];
+      const rootDisk = fileSystems.find((item) => item.mount === '/') || fileSystems[0] || { available: 0 };
 
       const cpuUsage = cpuLoad.currentLoad;
       const ramUsagePercent = (memory.used / memory.total) * 100;
