@@ -6,7 +6,7 @@ function escapeMarkdown(value) {
     '>', '#', '+', '-', '=', '|', '{', '}', '.', '!',
   ];
 
-  const escapedBackslash = String(value).replace(/\\/g, '\\\\');
+  const escapedBackslash = String(value).split('\\').join('\\\\');
   return markdownSpecialChars.reduce((escapedText, specialChar) => {
     return escapedText.replaceAll(specialChar, `\\${specialChar}`);
   }, escapedBackslash);
