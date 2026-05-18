@@ -4,12 +4,12 @@ function createAuthMiddleware(config) {
       const senderId = ctx.from?.id;
       if (senderId !== config.authorizedTelegramId) {
         const deniedMessage =
-          '🚫 *Cảnh báo bảo mật*\n\n' +
+          '🚫 <b>Cảnh báo bảo mật</b>\n\n' +
           'Bạn không có quyền sử dụng bot này.';
 
         // Chỉ trả lời khi có khả năng phản hồi tin nhắn.
         if (typeof ctx.reply === 'function') {
-          await ctx.reply(deniedMessage, { parse_mode: 'Markdown' });
+          await ctx.reply(deniedMessage, { parse_mode: 'HTML' });
         }
 
         console.warn(
@@ -24,7 +24,7 @@ function createAuthMiddleware(config) {
       if (typeof ctx.reply === 'function') {
         await ctx
           .reply('⚠️ Có lỗi khi kiểm tra quyền truy cập.', {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
           })
           .catch((replyError) => {
             console.error('[AUTH_MIDDLEWARE_REPLY_ERROR]', replyError);
