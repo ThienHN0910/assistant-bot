@@ -1,30 +1,27 @@
 const si = require('systeminformation');
 
-function formatDuration(seconds) {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
+module.exports = {
+    name: 'uptime',
+    description: 'Xem thời gian uptime của server',
+    async execute(ctx) {
+        try {
+            // Hàm si.time() là hàm đồng bộ (Synchronous), không dùng .then() hay await ở đây
+            const timeData = si.time();
+            const uptimeSeconds = timeData.uptime;
 
-  return `${days} ngày ${hours} giờ ${minutes} phút`;
-}
+            const days = Math.floor(uptimeSeconds / (24 * 3600));
+            const hours = Math.floor((uptimeSeconds % (24 * 3600)) / 3600);
+            const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+            const seconds = Math.floor(uptimeSeconds % 60);
 
-function registerUptimeCommand(bot) {
-  bot.command('uptime', async (ctx) => {
-    try {
-      // si.time() may be synchronous in some versions of systeminformation.
-      // Support both synchronous return and Promise return without using .then().
-      const timeResult = si.time();
-      const resolved = typeof timeResult?.then === 'function' ? await timeResult : timeResult;
-      const uptimeSeconds = (resolved && typeof resolved.uptime === 'number') ? resolved.uptime : 0;
+            const message = `⏱️ <b>TRẠNG THÁI HOẠT ĐỘNG SERVER</b>\n\n` +
+                            `• <b>Thời gian đã chạy:</b> <code>${days} ngày, ${hours} giờ, ${minutes} phút, ${seconds} giây</code>\n` +
+                            `• <b>Khởi động lúc:</b> <code>${new Date(timeData.boot_time).toLocaleString('vi-VN')}</code>`;
 
-      await ctx.reply(`⏱️ Uptime server: <b>${formatDuration(uptimeSeconds)}</b>`, {
-        parse_mode: 'HTML',
-      });
-    } catch (error) {
-      console.error('[UPTIME_COMMAND_ERROR]', error);
-      await ctx.reply('⚠️ Không thể lấy uptime server lúc này.');
+            await ctx.replyWithHTML(message);
+        } catch (error) {
+            console.error('[UPTIME_COMMAND_ERROR]', error);
+            await ctx.reply('⚠️ Không thể lấy thời gian hoạt động của server lúc này.');
+        }
     }
-  });
-}
-
-module.exports = { registerUptimeCommand };
+};
