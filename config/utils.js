@@ -1,5 +1,14 @@
 const fs = require('fs/promises');
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function readLastLines(filePath, lineCount = 20) {
   const content = await fs.readFile(filePath, 'utf8');
   const lines = content.split(/\r?\n/);
@@ -15,12 +24,32 @@ function formatBytes(bytes) {
   return `${gb.toFixed(2)} GB`;
 }
 
+function formatFileSize(bytes) {
+  const size = Number(bytes) || 0;
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let value = size / 1024;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(value >= 100 ? 0 : 2)} ${units[unitIndex]}`;
+}
+
 function formatPercent(value) {
   return `${Number(value).toFixed(2)}%`;
 }
 
 module.exports = {
+  escapeHtml,
   readLastLines,
   formatBytes,
+  formatFileSize,
   formatPercent,
 };

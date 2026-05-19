@@ -14,6 +14,14 @@ module.exports = {
       lines.push('• /ip - Lấy IP public hiện tại');
       lines.push('• /logs - Xem 20 dòng log lỗi PM2 gần nhất');
       lines.push('• /uptime - Xem thời gian uptime của server');
+      lines.push('• /ls - Liệt kê file và thư mục trong thư mục hiện tại');
+      lines.push('• /cd - Đổi thư mục làm việc hiện tại');
+      lines.push('• /cat - Đọc file text an toàn');
+      lines.push('• /cleancache - Dọn cache an toàn và flush log PM2');
+      lines.push('• /npmcache - Dọn cache npm');
+      lines.push('• /sh - Chạy lệnh shell theo whitelist an toàn');
+      lines.push('• /restart - Restart process PM2 của bot');
+      lines.push('• /stop - Stop process PM2 của bot');
       lines.push('');
       // Dùng thẻ <code> để chữ notes.txt nhìn giống code block Monospace đẹp mắt
       lines.push('<b>📝 Snippet ghi chú:</b>');
@@ -25,7 +33,11 @@ module.exports = {
         reply_markup: {
           keyboard: [
             [{ text: '/status' }, { text: '/ip' }],
-            [{ text: '/logs' }, { text: '/uptime' }]
+            [{ text: '/logs' }, { text: '/uptime' }],
+            [{ text: '/ls' }, { text: '/cleancache' }],
+            [{ text: '/cd' }, { text: '/cat' }],
+            [{ text: '/npmcache' }, { text: '/restart' }],
+            [{ text: '/stop' }, { text: '/sh' }]
           ],
           resize_keyboard: true,
           one_time_keyboard: false,

@@ -1,89 +1,123 @@
 # assistant-bot
 
-Telegram bot tro ly ca nhan cho lap trinh vien, xay dung bang Node.js + Telegraf.
+Telegram bot trợ lý cá nhân cho lập trình viên, xây dựng bằng Node.js và Telegraf.
 
-Bot ho tro:
-- Kiem tra tai nguyen server
-- Lay IP public
-- Doc log loi PM2
-- Xem uptime
-- Luu ghi chu tu tin nhan text thuong
-- Gioi han truy cap theo 1 Telegram ID duoc uy quyen
+Bot hiện hỗ trợ:
+- Kiểm tra tài nguyên server: CPU, RAM, SWAP và dung lượng đĩa còn trống
+- Lấy IP public qua ipify
+- Đọc 20 dòng cuối của file PM2 error log
+- Xem uptime và thời điểm boot của server
+- Lưu ghi chú từ các tin nhắn text thường vào file local
+- Giới hạn truy cập theo một Telegram ID được cấp quyền
+- Liệt kê file và thư mục, đọc file text, đổi thư mục làm việc
+- Dọn cache an toàn, dọn cache npm, và điều khiển process PM2 cơ bản
+- Chạy shell theo whitelist an toàn
 
-## Tinh nang
+## Tính năng chính
 
-- Bao mat:
-  - Middleware chan tat ca Telegram ID khong hop le
-- Lenh Telegram:
-  - /start: Hien thi huong dan va danh sach lenh
-  - /status: CPU, RAM, SWAP, dung luong trong dia
-  - /ip: Lay IP public qua ipify
-  - /logs: Doc 20 dong cuoi tu file PM2 error log
-  - /uptime: Thoi gian uptime cua server
+- Bảo mật:
+  - Middleware chặn toàn bộ Telegram ID không khớp với `AUTHORIZED_TELEGRAM_ID`
+- Lệnh Telegram:
+  - `/start`: Hiển thị menu và các lệnh có sẵn
+  - `/status`: Báo cáo CPU, RAM, SWAP và disk
+  - `/ip`: Lấy IP public hiện tại
+  - `/logs`: Đọc 20 dòng log lỗi PM2 gần nhất
+  - `/uptime`: Xem thời gian uptime của server
 - Text handler:
-  - Tin nhan text khong bat dau bang / se duoc append vao file ghi chu
-- Van hanh:
-  - Graceful shutdown voi SIGINT, SIGTERM
-  - Bat loi runtime de tranh vo tien trinh bat ngo
+  - Tin nhắn text không bắt đầu bằng `/` sẽ được append vào file ghi chú
+- Vận hành:
+  - Xử lý graceful shutdown với `SIGINT` và `SIGTERM`
+  - Bọc lỗi runtime để bot không thoát đột ngột khi gặp lỗi xử lý
 
-## Yeu cau
+## Yêu cầu
 
-- Node.js 18+ (khuyen nghi LTS)
+- Node.js 18+ (khuyến nghị LTS)
 - npm 9+
-- Telegram bot token (tao qua BotFather)
+- Telegram bot token từ BotFather
+- Một Telegram user ID được phép dùng bot
+- File PM2 error log hợp lệ cho lệnh `/logs`
 
-## Cai dat va chay local
+## Cài đặt và chạy local
 
 ```bash
 npm install
-cp .env.example .env
-# sua file .env voi gia tri that
-npm run dev
 ```
 
-## Bien moi truong
+Tạo file `.env` từ mẫu:
 
-Tham khao file .env.example.
+- Windows PowerShell:
 
-- BOT_TOKEN:
-  - Token cua Telegram bot
-- AUTHORIZED_TELEGRAM_ID:
-  - Telegram user ID duy nhat duoc phep dung bot
-- PM2_ERROR_LOG_PATH:
-  - Duong dan toi file error log cua PM2
-- TIMEZONE:
-  - Mui gio dung khi luu ghi chu, mac dinh Asia/Ho_Chi_Minh
-- NOTES_FILE_PATH:
-  - Duong dan file ghi chu, mac dinh ./notes.txt
+  ```powershell
+  Copy-Item .env.example .env
+  ```
 
-Vi du PM2_ERROR_LOG_PATH:
-- Linux: /home/ubuntu/.pm2/logs/dev-assistant-bot-error.log
-- Windows: C:/Users/<user>/.pm2/logs/dev-assistant-bot-error.log
+- macOS/Linux:
+
+  ```bash
+  cp .env.example .env
+  ```
+
+Sau đó sửa `.env` với giá trị thật và chạy:
+
+```bash
+npm start
+```
+
+Nếu muốn chạy trực tiếp ở chế độ phát triển, dùng `npm run dev`.
+
+## Biến môi trường
+
+Tham khảo file [.env.example](.env.example).
+
+- `BOT_TOKEN`:
+  - Token của Telegram bot
+- `AUTHORIZED_TELEGRAM_ID`:
+  - Telegram user ID duy nhất được phép sử dụng bot
+- `PM2_ERROR_LOG_PATH`:
+  - Đường dẫn tới file error log của PM2 để lệnh `/logs` đọc nội dung
+- `TIMEZONE`:
+  - Múi giờ dùng khi lưu ghi chú, mặc định là `Asia/Ho_Chi_Minh`
+- `NOTES_FILE_PATH`:
+  - Đường dẫn file ghi chú cục bộ, mặc định là `./notes.txt`
+- `PM2_PROCESS_NAME`:
+  - Tên process PM2 để dùng cho `/restart` và `/stop`, mặc định là `dev-assistant-bot`
+
+Ví dụ `PM2_ERROR_LOG_PATH`:
+- Linux: `/home/ubuntu/.pm2/logs/dev-assistant-bot-error.log`
+- Windows: `C:/Users/<user>/.pm2/logs/dev-assistant-bot-error.log`
 
 ## Scripts
 
 ```bash
-npm run dev
 npm start
+npm run dev
 npm run check:syntax
-npm run build
 ```
 
-Y nghia:
-- dev/start: chay bot
-- check:syntax: check syntax tat ca file JS chinh bang node --check
-- build: alias cua check:syntax
+Ý nghĩa:
+- `start` và `dev`: chạy bot bằng Node.js
+- `check:syntax`: kiểm tra cú pháp các file JS chính bằng `node --check`
 
-## Cau truc du an
+Lưu ý: dự án hiện chưa có bước transpile hoặc bundling, nên không có script `build` riêng.
+
+## Cấu trúc dự án
 
 ```text
 assistant-bot/
 ├── bot.js
 ├── commands/
+│   ├── cat.js
+│   ├── cd.js
+│   ├── cleancache.js
 │   ├── ip.js
+│   ├── ls.js
 │   ├── logs.js
+│   ├── npmcache.js
+│   ├── restart.js
+│   ├── sh.js
 │   ├── start.js
 │   ├── status.js
+│   ├── stop.js
 │   └── uptime.js
 ├── config/
 │   ├── env.js
@@ -91,6 +125,9 @@ assistant-bot/
 │   └── utils.js
 ├── handlers/
 │   └── textHandler.js
+├── docs/
+│   ├── feature-matrix.md
+│   └── shell-maintenance-spec.md
 ├── .env.example
 ├── .gitignore
 ├── LICENSE
@@ -98,7 +135,7 @@ assistant-bot/
 └── README.md
 ```
 
-## Chay bang PM2 (Ubuntu)
+## Chạy với PM2
 
 ```bash
 npm install -g pm2
@@ -108,8 +145,8 @@ pm2 logs dev-assistant-bot
 pm2 save
 ```
 
-## Luu y
+## Lưu ý
 
-- Neu /logs bao loi, kiem tra lai PM2_ERROR_LOG_PATH ton tai va co quyen doc.
-- Du an hien tai khong co transpile bundling; build la buoc kiem tra syntax.
-- De an toan, khong commit file .env va du lieu notes that.
+- Xem [docs/feature-matrix.md](docs/feature-matrix.md) để biết trạng thái hiện tại của bot và các tính năng an toàn đã được bổ sung.
+- Xem [docs/shell-maintenance-spec.md](docs/shell-maintenance-spec.md) để hiểu rõ whitelist shell, flow dọn cache, và các ràng buộc bảo mật của nhóm lệnh mới.
+- File ghi chú sẽ được tạo hoặc append tự động khi bot nhận text thường.
