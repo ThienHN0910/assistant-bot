@@ -10,7 +10,7 @@ Bot hiện hỗ trợ:
 - Lưu ghi chú từ các tin nhắn text thường vào file local
 - Giới hạn truy cập theo một Telegram ID được cấp quyền
 - Liệt kê file và thư mục, đọc file text, đổi thư mục làm việc
-- Dọn cache an toàn, dọn cache npm, và điều khiển process PM2 cơ bản
+- Dọn cache an toàn, dọn cache npm, và dừng process PM2 cơ bản
 - Chạy shell theo whitelist an toàn
 
 ## Tính năng chính
@@ -80,7 +80,7 @@ Tham khảo file [.env.example](.env.example).
 - `NOTES_FILE_PATH`:
   - Đường dẫn file ghi chú cục bộ, mặc định là `./notes.txt`
 - `PM2_PROCESS_NAME`:
-  - Tên process PM2 để dùng cho `/restart` và `/stop`, mặc định là `dev-assistant-bot`
+  - Tên process PM2 để dùng cho `/stop`, mặc định là `dev-assistant-bot`
 
 Ví dụ `PM2_ERROR_LOG_PATH`:
 - Linux: `/home/ubuntu/.pm2/logs/dev-assistant-bot-error.log`
@@ -113,7 +113,6 @@ assistant-bot/
 │   ├── ls.js
 │   ├── logs.js
 │   ├── npmcache.js
-│   ├── restart.js
 │   ├── sh.js
 │   ├── start.js
 │   ├── status.js
@@ -150,3 +149,4 @@ pm2 save
 - Xem [docs/feature-matrix.md](docs/feature-matrix.md) để biết trạng thái hiện tại của bot và các tính năng an toàn đã được bổ sung.
 - Xem [docs/shell-maintenance-spec.md](docs/shell-maintenance-spec.md) để hiểu rõ whitelist shell, flow dọn cache, và các ràng buộc bảo mật của nhóm lệnh mới.
 - File ghi chú sẽ được tạo hoặc append tự động khi bot nhận text thường.
+- Tính năng khởi động lại process qua PM2 đã được gỡ bỏ để tránh rủi ro tự lặp khi điều khiển bot.

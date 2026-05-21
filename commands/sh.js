@@ -11,6 +11,10 @@ const WHITELIST = [
   'ls -alh',
   'pwd',
   'git pull origin main',
+  'npm ci',
+  'npm run check:syntax',
+  'pm2 reload assistant-bot --update-env',
+  'git pull origin main && npm ci && npm run check:syntax && pm2 reload assistant-bot --update-env',
   'pm2 list',
   'uname -a',
 ];

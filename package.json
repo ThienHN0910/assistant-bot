@@ -4,7 +4,7 @@
   "description": "Telegram Dev Assistant Bot",
   "main": "bot.js",
   "scripts": {
-    "check:syntax": "node --check bot.js && node --check commands/start.js && node --check commands/status.js && node --check commands/ip.js && node --check commands/logs.js && node --check commands/uptime.js && node --check commands/ls.js && node --check commands/cd.js && node --check commands/cat.js && node --check commands/cleancache.js && node --check commands/npmcache.js && node --check commands/sh.js && node --check commands/restart.js && node --check commands/stop.js && node --check config/env.js && node --check config/middleware.js && node --check config/utils.js && node --check handlers/textHandler.js",
+    "check:syntax": "node --check bot.js && node --check commands/start.js && node --check commands/status.js && node --check commands/ip.js && node --check commands/logs.js && node --check commands/uptime.js && node --check commands/ls.js && node --check commands/cd.js && node --check commands/cat.js && node --check commands/cleancache.js && node --check commands/npmcache.js && node --check commands/sh.js && node --check commands/stop.js && node --check config/env.js && node --check config/middleware.js && node --check config/utils.js && node --check handlers/textHandler.js",
     "start": "node bot.js",
     "dev": "node bot.js"
   },

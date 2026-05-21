@@ -12,7 +12,6 @@ const catCommand = require("./commands/cat");
 const cleanCacheCommand = require("./commands/cleancache");
 const npmcacheCommand = require("./commands/npmcache");
 const shCommand = require("./commands/sh");
-const restartCommand = require("./commands/restart");
 const stopCommand = require("./commands/stop");
 const { createTextHandler } = require("./handlers/textHandler");
 
@@ -39,7 +38,6 @@ async function startBot() {
       cleanCacheCommand,
       npmcacheCommand,
       shCommand,
-      restartCommand,
       stopCommand,
     ];
 

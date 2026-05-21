@@ -20,7 +20,6 @@ module.exports = {
       lines.push('• /cleancache - Dọn cache an toàn và flush log PM2');
       lines.push('• /npmcache - Dọn cache npm');
       lines.push('• /sh - Chạy lệnh shell theo whitelist an toàn');
-      lines.push('• /restart - Restart process PM2 của bot');
       lines.push('• /stop - Stop process PM2 của bot');
       lines.push('');
       // Dùng thẻ <code> để chữ notes.txt nhìn giống code block Monospace đẹp mắt
@@ -36,7 +35,7 @@ module.exports = {
             [{ text: '/logs' }, { text: '/uptime' }],
             [{ text: '/ls' }, { text: '/cleancache' }],
             [{ text: '/cd' }, { text: '/cat' }],
-            [{ text: '/npmcache' }, { text: '/restart' }],
+            [{ text: '/npmcache' }, { text: '/stop' }],
             [{ text: '/stop' }, { text: '/sh' }]
           ],
           resize_keyboard: true,
