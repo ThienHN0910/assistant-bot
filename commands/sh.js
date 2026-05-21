@@ -8,6 +8,9 @@ const WHITELIST = [
   'df -h',
   'free -m',
   'git status',
+  'ls -alh',
+  'pwd',
+  'git pull origin main',
   'pm2 list',
   'uname -a',
 ];

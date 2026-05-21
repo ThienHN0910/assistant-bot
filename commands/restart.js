@@ -56,7 +56,7 @@ module.exports = {
   description: 'Khởi động lại process PM2 của bot',
   execute: async (ctx) => {
     try {
-      const processName = process.env.PM2_PROCESS_NAME || 'dev-assistant-bot';
+      const processName = process.env.PM2_PROCESS_NAME || 'assistant-bot';
       const command = `pm2 restart ${processName}`;
       const result = await runCommand(command);
 
