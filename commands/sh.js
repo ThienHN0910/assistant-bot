@@ -10,11 +10,15 @@ const ALLOWED_GIT_SUBCOMMANDS = new Set(['pull', 'status', 'fetch', 'checkout', 
 const ALLOWED_NPM_SUBCOMMANDS = new Set(['ci', 'run']);
 const ALLOWED_PM2_SUBCOMMANDS = new Set(['reload', 'list']);
 
-function isSafeCommand(command) {
+// Allow chaining with && and || but only if every subcommand is safe
+const ALLOW_CHAINING = true;
+const CHAIN_SPLITTER = /\s*(?:&&|\|\|)\s*/;
+
+function isSafeSingleCommand(command) {
   if (!command) return false;
 
-  // Disallow command chaining, pipes, redirection, subshells, and other risky chars
-  const forbidden = /[;|<>`$(){}]/;
+  // Disallow a set of obviously dangerous characters
+  const forbidden = /[;<>`$(){}]/;
   if (forbidden.test(command)) return false;
 
   const tokens = command.trim().split(/\s+/);
@@ -22,7 +26,6 @@ function isSafeCommand(command) {
 
   if (!ALLOWED_BASES.has(base)) return false;
 
-  // Per-base validation for common tools
   if (base === 'git') {
     const sub = tokens[1];
     if (!sub || !ALLOWED_GIT_SUBCOMMANDS.has(sub)) return false;
@@ -38,9 +41,38 @@ function isSafeCommand(command) {
     if (!sub || !ALLOWED_PM2_SUBCOMMANDS.has(sub)) return false;
   }
 
-  // Ensure each token doesn't contain forbidden characters (double-check)
+  // Token-level safety: allow alphanum and common symbols used in flags/paths
+  const safeToken = /^[A-Za-z0-9._\-:\/=@]+$/;
   for (const t of tokens) {
-    if (forbidden.test(t)) return false;
+    if (!safeToken.test(t)) return false;
+  }
+
+  return true;
+}
+
+function isSafeCommand(command) {
+  if (!command) return false;
+
+  // Reject other dangerous characters early
+  const forbidden = /[;<>`$(){}]/;
+  if (forbidden.test(command)) return false;
+
+  // If chaining not allowed, also reject any & or |
+  if (!ALLOW_CHAINING && /[&|]/.test(command)) return false;
+
+  // If chaining allowed, ensure only valid operators appear (&& or ||)
+  if (ALLOW_CHAINING) {
+    // Remove all valid chain tokens and check leftover for stray & or |
+    const tmp = command.replace(/&&/g, '').replace(/\|\|/g, '');
+    if (/[&|]/.test(tmp)) return false;
+  }
+
+  const parts = ALLOW_CHAINING ? command.split(CHAIN_SPLITTER) : [command];
+  if (parts.length === 0) return false;
+
+  for (const p of parts) {
+    const sub = p.trim();
+    if (!isSafeSingleCommand(sub)) return false;
   }
 
   return true;
