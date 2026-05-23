@@ -4,20 +4,47 @@ const { escapeHtml } = require('../config/utils');
 
 const execAsync = promisify(exec);
 
-const WHITELIST = [
-  'df -h',
-  'free -m',
-  'git status',
-  'ls -alh',
-  'pwd',
-  'git pull origin main',
-  'npm ci',
-  'npm run check:syntax',
-  'pm2 reload assistant-bot --update-env',
-  'git pull origin main && npm ci && npm run check:syntax && pm2 reload assistant-bot --update-env',
-  'pm2 list',
-  'uname -a',
-];
+// Allowed base commands and safe subcommands. We accept arguments but sanitize them
+const ALLOWED_BASES = new Set(['ls', 'git', 'df', 'free', 'pwd', 'npm', 'pm2', 'uname']);
+const ALLOWED_GIT_SUBCOMMANDS = new Set(['pull', 'status', 'fetch', 'checkout', 'rev-parse']);
+const ALLOWED_NPM_SUBCOMMANDS = new Set(['ci', 'run']);
+const ALLOWED_PM2_SUBCOMMANDS = new Set(['reload', 'list']);
+
+function isSafeCommand(command) {
+  if (!command) return false;
+
+  // Disallow command chaining, pipes, redirection, subshells, and other risky chars
+  const forbidden = /[;|<>`$(){}]/;
+  if (forbidden.test(command)) return false;
+
+  const tokens = command.trim().split(/\s+/);
+  const base = tokens[0];
+
+  if (!ALLOWED_BASES.has(base)) return false;
+
+  // Per-base validation for common tools
+  if (base === 'git') {
+    const sub = tokens[1];
+    if (!sub || !ALLOWED_GIT_SUBCOMMANDS.has(sub)) return false;
+  }
+
+  if (base === 'npm') {
+    const sub = tokens[1];
+    if (!sub || !ALLOWED_NPM_SUBCOMMANDS.has(sub)) return false;
+  }
+
+  if (base === 'pm2') {
+    const sub = tokens[1];
+    if (!sub || !ALLOWED_PM2_SUBCOMMANDS.has(sub)) return false;
+  }
+
+  // Ensure each token doesn't contain forbidden characters (double-check)
+  for (const t of tokens) {
+    if (forbidden.test(t)) return false;
+  }
+
+  return true;
+}
 
 function extractShellCommand(ctx) {
   const text = ctx.message?.text || '';
@@ -90,8 +117,8 @@ module.exports = {
         return;
       }
 
-      if (!WHITELIST.includes(command)) {
-        await ctx.replyWithHTML('🚫 Lệnh không nằm trong danh sách whitelist an toàn!');
+      if (!isSafeCommand(command)) {
+        await ctx.replyWithHTML('🚫 Lệnh không hợp lệ hoặc không nằm trong danh sách cho phép an toàn!');
         return;
       }
 
