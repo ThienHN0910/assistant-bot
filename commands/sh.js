@@ -1,162 +1,69 @@
-const { promisify } = require('util');
-const { exec } = require('child_process');
 const { escapeHtml } = require('../config/utils');
-
-const execAsync = promisify(exec);
-
-// Allowed base commands and safe subcommands. We accept arguments but sanitize them
-const ALLOWED_BASES = new Set(['ls', 'git', 'df', 'free', 'pwd', 'npm', 'pm2', 'uname']);
-const ALLOWED_GIT_SUBCOMMANDS = new Set(['pull', 'status', 'fetch', 'checkout', 'rev-parse']);
-const ALLOWED_NPM_SUBCOMMANDS = new Set(['ci', 'run']);
-const ALLOWED_PM2_SUBCOMMANDS = new Set(['reload', 'list']);
-
-// Allow chaining with && and || but only if every subcommand is safe
-const ALLOW_CHAINING = true;
-const CHAIN_SPLITTER = /\s*(?:&&|\|\|)\s*/;
-
-function isSafeSingleCommand(command) {
-  if (!command) return false;
-
-  // Disallow a set of obviously dangerous characters
-  const forbidden = /[;<>`$(){}]/;
-  if (forbidden.test(command)) return false;
-
-  const tokens = command.trim().split(/\s+/);
-  const base = tokens[0];
-
-  if (!ALLOWED_BASES.has(base)) return false;
-
-  if (base === 'git') {
-    const sub = tokens[1];
-    if (!sub || !ALLOWED_GIT_SUBCOMMANDS.has(sub)) return false;
-  }
-
-  if (base === 'npm') {
-    const sub = tokens[1];
-    if (!sub || !ALLOWED_NPM_SUBCOMMANDS.has(sub)) return false;
-  }
-
-  if (base === 'pm2') {
-    const sub = tokens[1];
-    if (!sub || !ALLOWED_PM2_SUBCOMMANDS.has(sub)) return false;
-  }
-
-  // Token-level safety: allow alphanum and common symbols used in flags/paths
-  const safeToken = /^[A-Za-z0-9._\-:\/=@]+$/;
-  for (const t of tokens) {
-    if (!safeToken.test(t)) return false;
-  }
-
-  return true;
-}
-
-function isSafeCommand(command) {
-  if (!command) return false;
-
-  // Reject other dangerous characters early
-  const forbidden = /[;<>`$(){}]/;
-  if (forbidden.test(command)) return false;
-
-  // If chaining not allowed, also reject any & or |
-  if (!ALLOW_CHAINING && /[&|]/.test(command)) return false;
-
-  // If chaining allowed, ensure only valid operators appear (&& or ||)
-  if (ALLOW_CHAINING) {
-    // Remove all valid chain tokens and check leftover for stray & or |
-    const tmp = command.replace(/&&/g, '').replace(/\|\|/g, '');
-    if (/[&|]/.test(tmp)) return false;
-  }
-
-  const parts = ALLOW_CHAINING ? command.split(CHAIN_SPLITTER) : [command];
-  if (parts.length === 0) return false;
-
-  for (const p of parts) {
-    const sub = p.trim();
-    if (!isSafeSingleCommand(sub)) return false;
-  }
-
-  return true;
-}
+const whitelist = require('../lib/whitelist');
+const runner = require('../lib/runner');
 
 function extractShellCommand(ctx) {
   const text = ctx.message?.text || '';
-  const firstSpaceIndex = text.indexOf(' ');
-
-  if (firstSpaceIndex === -1) {
-    return '';
-  }
-
-  return text.slice(firstSpaceIndex + 1).trim();
+  const parts = text.trim().split(/\s+/).slice(1);
+  return parts;
 }
 
-async function executeShellCommand(command) {
-  try {
-    const { stdout, stderr } = await execAsync(command, {
-      maxBuffer: 1024 * 1024,
-      timeout: 30000,
-      shell: '/bin/bash',
-    });
-
-    return {
-      ok: true,
-      stdout: stdout || '',
-      stderr: stderr || '',
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      stdout: error.stdout || '',
-      stderr: error.stderr || error.message || String(error),
-      code: error.code,
-    };
-  }
-}
-
-function buildOutputBlock(command, result) {
+function buildStepOutput(step, res) {
   const parts = [];
-  parts.push(`Lệnh: ${command}`);
-  parts.push(`Trạng thái: ${result.ok ? 'Thành công' : 'Thất bại'}`);
-
-  if (result.stdout) {
+  parts.push(`Lệnh: ${step.cmd} ${ (step.args || []).join(' ') }`.trim());
+  parts.push(`Trạng thái: ${res.ok ? 'Thành công' : 'Thất bại'}`);
+  if (res.stdout) {
     parts.push('');
     parts.push('stdout:');
-    parts.push(result.stdout.trimEnd());
+    parts.push(res.stdout.trimEnd());
   }
-
-  if (result.stderr) {
+  if (res.stderr) {
     parts.push('');
     parts.push('stderr:');
-    parts.push(result.stderr.trimEnd());
+    parts.push(res.stderr.trimEnd());
   }
-
-  if (typeof result.code !== 'undefined') {
+  if (typeof res.code !== 'undefined') {
     parts.push('');
-    parts.push(`exit code: ${result.code}`);
+    parts.push(`exit code: ${res.code}`);
   }
-
   return parts.join('\n');
 }
 
 module.exports = {
   name: 'sh',
-  description: 'Chạy lệnh shell theo whitelist an toàn',
+  description: 'Chạy lệnh shell theo whitelist an toàn (sử dụng aliases)',
   execute: async (ctx) => {
     try {
-      const command = extractShellCommand(ctx);
+      const parts = extractShellCommand(ctx);
 
-      if (!command) {
-        await ctx.replyWithHTML('⚠️ Cú pháp: <code>/sh &lt;lệnh&gt;</code>');
+      if (!parts || parts.length === 0) {
+        const aliases = whitelist.listAliases().map(a => `/${a}`).join('\n');
+        await ctx.replyWithHTML(`⚠️ Cú pháp: <code>/sh /alias [args]</code>\n\nDanh sách alias:\n<pre>${escapeHtml(aliases)}</pre>`);
         return;
       }
 
-      if (!isSafeCommand(command)) {
-        await ctx.replyWithHTML('🚫 Lệnh không hợp lệ hoặc không nằm trong danh sách cho phép an toàn!');
+      const first = parts[0];
+      const alias = first.startsWith('/') ? first.slice(1) : first;
+      const args = parts.slice(1);
+
+      let commands;
+      try {
+        commands = whitelist.getCommands(alias, args);
+      } catch (err) {
+        await ctx.replyWithHTML(`🚫 Lỗi: ${escapeHtml(String(err.message || err))}`);
         return;
       }
 
-      const result = await executeShellCommand(command);
-      const output = buildOutputBlock(command, result);
+      const results = await runner.runSequence(commands, { timeoutMs: 60000 });
 
+      const blocks = [];
+      for (let i = 0; i < commands.length; i++) {
+        const step = commands[i];
+        const res = results[i] || { ok: false, stdout: '', stderr: 'No result', code: null };
+        blocks.push(buildStepOutput(step, res));
+      }
+
+      const output = blocks.join('\n\n-----\n\n');
       await ctx.replyWithHTML(`<pre>${escapeHtml(output)}</pre>`);
     } catch (error) {
       console.error('[SH_COMMAND_ERROR]', error);
