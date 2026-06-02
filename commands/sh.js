@@ -64,7 +64,24 @@ module.exports = {
       }
 
       const output = blocks.join('\n\n-----\n\n');
-      await ctx.replyWithHTML(`<pre>${escapeHtml(output)}</pre>`);
+      const escaped = escapeHtml(output);
+
+      // Telegram has message size limits; if too long, send as file instead
+      try {
+        if (escaped.length <= 3500) {
+          await ctx.replyWithHTML(`<pre>${escaped}</pre>`);
+        } else {
+          // send short summary and attach full output as document
+          await ctx.replyWithHTML('Kết quả quá dài, gửi dưới dạng file đính kèm.');
+          const buffer = Buffer.from(output, 'utf8');
+          await ctx.replyWithDocument({ source: buffer, filename: `${alias}-output.txt` });
+        }
+      } catch (sendErr) {
+        console.error('[SH_REPLY_ERROR]', sendErr);
+        // fallback: try to send truncated message
+        const truncated = escaped.slice(0, 3500) + '\n\n... (đã rút gọn)';
+        await ctx.replyWithHTML(`<pre>${truncated}</pre>`).catch(() => {});
+      }
     } catch (error) {
       console.error('[SH_COMMAND_ERROR]', error);
       await ctx.replyWithHTML('⚠️ Không thể thực thi lệnh shell lúc này.');
