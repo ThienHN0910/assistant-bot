@@ -6,9 +6,7 @@ const statusCommand = require("./commands/status");
 const ipCommand = require("./commands/ip");
 const logsCommand = require("./commands/logs");
 const uptimeCommand = require("./commands/uptime");
-const lsCommand = require("./commands/ls");
-const cdCommand = require("./commands/cd");
-const catCommand = require("./commands/cat");
+// `ls`, `cd`, `cat` moved into `sh` whitelist aliases; individual command files removed
 const cleanCacheCommand = require("./commands/cleancache");
 const npmcacheCommand = require("./commands/npmcache");
 const shCommand = require("./commands/sh");
@@ -32,9 +30,6 @@ async function startBot() {
       ipCommand,
       logsCommand,
       uptimeCommand,
-      lsCommand,
-      cdCommand,
-      catCommand,
       cleanCacheCommand,
       npmcacheCommand,
       shCommand,
