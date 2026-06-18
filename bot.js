@@ -75,7 +75,7 @@ async function startBot() {
       console.error("[BOT_RUNTIME_ERROR]", error);
     });
 
-    await bot.launch();
+    await bot.launch({ dropPendingUpdates: true });
     console.log("✅ Dev Assistant Bot đang chạy mượt mà...");
   } catch (error) {
     console.error("[BOT_STARTUP_ERROR]", error);
