@@ -44,7 +44,7 @@ module.exports = {
           keyboard: [
             [{ text: '/status' }, { text: '/ip' }, { text: '/uptime' }],
             [{ text: '/logs' }, { text: '/cleancache' }, { text: '/npmcache' }],
-            [{ text: '/update' }, { text: '/stop' }, { text: '/update' }]
+            [{ text: '/update' }, { text: '/stop' }, { text: '/deploy-web -h' }]
           ],
           resize_keyboard: true,
           one_time_keyboard: false,
