@@ -58,6 +58,18 @@ module.exports = {
   description: 'Dọn cache an toàn và flush log PM2',
   execute: async (ctx) => {
     try {
+      const text = ctx.message?.text || '';
+      const args = text.trim().split(/\s+/).slice(1);
+      if (args.includes('-h') || args.includes('--help')) {
+        await ctx.replyWithHTML(
+          `ℹ️ <b>Hướng dẫn lệnh /cleancache</b>\n` +
+          `Dọn dẹp bộ nhớ đệm (RAM cache) và xóa sạch lịch sử log PM2 để giải phóng dung lượng đĩa máy chủ.\n\n` +
+          `<b>Cú pháp:</b> <code>/cleancache</code>\n` +
+          `<b>Ví dụ:</b> <code>/cleancache</code>`
+        );
+        return;
+      }
+
       const cacheCommand = process.platform === 'linux'
         ? 'sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches'
         : null;

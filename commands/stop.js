@@ -56,6 +56,18 @@ module.exports = {
   description: 'Dừng process PM2 của bot',
   execute: async (ctx) => {
     try {
+      const text = ctx.message?.text || '';
+      const args = text.trim().split(/\s+/).slice(1);
+      if (args.includes('-h') || args.includes('--help')) {
+        await ctx.replyWithHTML(
+          `ℹ️ <b>Hướng dẫn lệnh /stop</b>\n` +
+          `Dừng tiến trình PM2 của bot từ xa.\n\n` +
+          `<b>Cú pháp:</b> <code>/stop</code>\n` +
+          `<b>Ví dụ:</b> <code>/stop</code>`
+        );
+        return;
+      }
+
       const processName = process.env.PM2_PROCESS_NAME || 'dev-assistant-bot';
       const command = `pm2 stop ${processName}`;
       const result = await runCommand(command);

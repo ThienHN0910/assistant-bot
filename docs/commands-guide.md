@@ -28,6 +28,9 @@ Do bot có khả năng thực thi các câu lệnh hệ thống và truy cập d
 
 Đây là các câu lệnh chính của bot được đăng ký trực tiếp và có thể gọi nhanh thông qua Menu hoặc gõ `/`.
 
+> [!TIP]
+> **Hỗ trợ cờ Trợ giúp (`-h` / `--help`)**: Bạn có thể thêm hậu tố `-h` hoặc `--help` vào sau **bất kỳ câu lệnh trực tiếp nào** để yêu cầu bot trả về chi tiết cú pháp hướng dẫn và ví dụ mẫu của riêng câu lệnh đó (ví dụ: `/deploy-web -h`).
+
 ### `/start`
 *   **Chức năng**: Khởi động bot, hiển thị menu chào mừng và danh sách tất cả các lệnh khả dụng.
 *   **Cách dùng**: `/start`
@@ -72,20 +75,26 @@ Do bot có khả năng thực thi các câu lệnh hệ thống và truy cập d
 *   **Cách dùng**: `/npmcache`
 *   **Chi tiết hoạt động**: Thực thi lệnh `npm cache clean --force` để giải phóng không gian ổ đĩa bị chiếm dụng bởi cache npm cũ.
 
-### `/deploy`
-*   **Chức năng**: Kích hoạt quy trình deploy (triển khai) tự động và nhanh chóng bằng một chạm cho bot hoặc dự án hiện tại.
-*   **Cách dùng**: `/deploy`
+### `/update`
+*   **Chức năng**: Tự động cập nhật mã nguồn bot và khởi động lại tiến trình (git pull, npm install, npm build, pm2 restart).
+*   **Cách dùng**: `/update`
 *   **Chi tiết hoạt động**: Thực thi chuỗi lệnh sau theo trình tự:
-    1.  `git pull origin main` (cập nhật mã nguồn mới nhất).
-    2.  `npm install` (cài đặt các thư viện mới nếu có).
+    1.  `git pull origin main` (cập nhật mã nguồn bot mới nhất).
+    2.  `npm install` (cài đặt các thư viện mới của bot nếu có).
     3.  `npm run build` (biên dịch dự án).
-    4.  `pm2 restart all` (khởi động lại toàn bộ các ứng dụng trong PM2 để áp dụng thay đổi).
-*   **Lưu ý**: Kết quả chi tiết của từng bước sẽ được trả về dưới dạng HTML. Nếu kết quả quá dài (vượt quá 3500 ký tự - giới hạn của Telegram), bot sẽ tự động tạo file đính kèm `deploy-output.txt` gửi cho bạn.
+    4.  `pm2 restart all` (khởi động lại toàn bộ các ứng dụng để áp dụng thay đổi).
+*   **Lưu ý**: Kết quả chi tiết của từng bước sẽ được trả về dưới dạng HTML. Nếu kết quả quá dài (vượt quá 3500 ký tự - giới hạn của Telegram), bot sẽ tự động tạo file đính kèm `update-output.txt` gửi cho bạn.
 
 ### `/stop`
 *   **Chức năng**: Dừng tiến trình PM2 của bot từ xa.
 *   **Cách dùng**: `/stop`
 *   **Chi tiết hoạt động**: Thực thi lệnh `pm2 stop <tên_tiến_trình>`. Tên tiến trình mặc định là `dev-assistant-bot` hoặc được cấu hình thông qua biến môi trường `PM2_PROCESS_NAME`.
+
+### `/deploy-web`
+*   **Chức năng**: Triển khai website tĩnh/SPA trong 1 bước duy nhất (sử dụng script Bash tự động).
+*   **Cách dùng**: `/deploy-web <tên_project> <tên_file_zip> <tên_domain_hoặc_IP>`
+*   **Chi tiết hoạt động**: Thực thi script `bash ./scripts/deploy-web.sh <project> <zip> <server>` tự động xử lý toàn bộ: tạo thư mục, chuyển zip, giải nén, chmod, tạo Virtual Host Nginx, tạo symlink, test và reload Nginx.
+*   **Lưu ý**: Lệnh đòi hỏi truyền đầy đủ 3 tham số. Kết quả deploy chi tiết được trả về dưới dạng HTML. Nếu kết quả quá dài, bot sẽ gửi file đính kèm `deploy-<project>-output.txt`.
 
 ---
 
@@ -99,7 +108,7 @@ Lệnh `/sh` cho phép chạy các câu lệnh hoặc chuỗi câu lệnh hệ t
     `/sh /<alias> [tham_số_1] [tham_số_2] ...`
 *   **Xem danh sách aliases khả dụng**:
     Chỉ cần gõ `/sh` (không truyền tham số). Bot sẽ gửi lại danh sách toàn bộ các alias hợp lệ mà bạn có thể dùng.
-*   **Xử lý kết quả dài**: Tương tự như `/deploy`, nếu output của lệnh shell vượt quá 3500 ký tự, bot sẽ trả về file đính kèm dưới dạng `<alias>-output.txt` thay vì hiển thị trực tiếp trên khung chat.
+*   **Xử lý kết quả dài**: Tương tự như `/update`, nếu output của lệnh shell vượt quá 3500 ký tự, bot sẽ trả về file đính kèm dưới dạng `<alias>-output.txt` thay vì hiển thị trực tiếp trên khung chat.
 
 ---
 
@@ -113,7 +122,8 @@ Dưới đây là mô tả chi tiết của từng alias trong whitelist:
 | **`git-pull`** | Kéo code mới nhất từ nhánh chính. | `git pull origin main` | `/sh /git-pull` |
 | **`npm-install`**| Cài đặt các thư viện phụ thuộc. | `npm install` | `/sh /npm-install` |
 | **`npm-build`**  | Build dự án sang chế độ sản xuất. | `npm run build` | `/sh /npm-build` |
-| **`deploy`**     | Triển khai tự động chuỗi lệnh deploy. | Chạy tuần tự: `git pull origin main` $\to$ `npm install` $\to$ `npm run build` $\to$ `pm2 restart all`. | `/sh /deploy` *(Tương đương với lệnh direct `/deploy`)* |
+| **`update`**     | Cập nhật mã nguồn và khởi động lại bot. | Chạy tuần tự: `git pull origin main` $\to$ `npm install` $\to$ `npm run build` $\to$ `pm2 restart all`. | `/sh /update` *(Tương đương lệnh direct `/update`)* |
+| **`deploy-web`** | Triển khai website tĩnh/SPA trong 1 bước duy nhất (sử dụng script Bash). | Thực thi script `bash ./scripts/deploy-web.sh <project> <zip> <server>` tự động xử lý: tạo thư mục, chuyển zip, giải nén, chmod, tạo Virtual Host Nginx, tạo symlink, test và reload Nginx. | `/sh /deploy-web my-portfolio dist.zip mydomain.com`<br>*Tham số thứ tự: `[tên_project] [tên_file_zip] [tên_domain_hoặc_IP]`* |
 | **`nginx-test`** | Kiểm tra cú pháp file cấu hình Nginx. | `sudo nginx -t` (yêu cầu quyền sudo) | `/sh /nginx-test` |
 | **`nginx-reload`**| Tải lại cấu hình Nginx không downtime. | `sudo systemctl reload nginx` (yêu cầu quyền sudo) | `/sh /nginx-reload` |
 | **`nginx-status`**| Xem trạng thái hoạt động của Nginx. | `sudo systemctl status nginx` (yêu cầu quyền sudo) | `/sh /nginx-status` |

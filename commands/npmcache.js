@@ -56,6 +56,18 @@ module.exports = {
   description: 'Dọn cache npm',
   execute: async (ctx) => {
     try {
+      const text = ctx.message?.text || '';
+      const args = text.trim().split(/\s+/).slice(1);
+      if (args.includes('-h') || args.includes('--help')) {
+        await ctx.replyWithHTML(
+          `ℹ️ <b>Hướng dẫn lệnh /npmcache</b>\n` +
+          `Dọn dẹp bộ nhớ đệm của trình quản lý gói npm.\n\n` +
+          `<b>Cú pháp:</b> <code>/npmcache</code>\n` +
+          `<b>Ví dụ:</b> <code>/npmcache</code>`
+        );
+        return;
+      }
+
       const command = 'npm cache clean --force';
       const result = await runCommand(command);
 

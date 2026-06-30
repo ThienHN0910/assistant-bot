@@ -11,7 +11,8 @@ const cleanCacheCommand = require("./commands/cleancache");
 const npmcacheCommand = require("./commands/npmcache");
 const shCommand = require("./commands/sh");
 const stopCommand = require("./commands/stop");
-const deployCommand = require("./commands/deploy");
+const updateCommand = require("./commands/update");
+const deployWebCommand = require("./commands/deploy-web");
 const { createTextHandler } = require("./handlers/textHandler");
 
 let bot;
@@ -35,7 +36,8 @@ async function startBot() {
       npmcacheCommand,
       shCommand,
       stopCommand,
-      deployCommand,
+      updateCommand,
+      deployWebCommand,
     ];
 
     for (const mod of modules) {

@@ -36,9 +36,15 @@ module.exports = {
     try {
       const parts = extractShellCommand(ctx);
 
-      if (!parts || parts.length === 0) {
+      if (!parts || parts.length === 0 || parts.includes('-h') || parts.includes('--help')) {
         const aliases = whitelist.listAliases().map(a => `/${a}`).join('\n');
-        await ctx.replyWithHTML(`⚠️ Cú pháp: <code>/sh /alias [args]</code>\n\nDanh sách alias:\n<pre>${escapeHtml(aliases)}</pre>`);
+        await ctx.replyWithHTML(
+          `ℹ️ <b>Hướng dẫn lệnh /sh</b>\n` +
+          `Chạy câu lệnh shell an toàn thông qua các bí danh (aliases) trong danh sách whitelist.\n\n` +
+          `<b>Cú pháp:</b> <code>/sh /&lt;bí_danh&gt; [các_tham_số...]</code>\n\n` +
+          `<b>Danh sách bí danh khả dụng:</b>\n<pre>${escapeHtml(aliases)}</pre>\n` +
+          `<b>Ví dụ mẫu:</b> <code>/sh /pm2-restart assistant-bot</code>`
+        );
         return;
       }
 

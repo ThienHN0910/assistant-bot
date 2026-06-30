@@ -107,7 +107,7 @@ assistant-bot/
 ├── bot.js
 ├── commands/
 │   ├── cleancache.js
-│   ├── deploy.js
+│   ├── deploy-web.js
 │   ├── ip.js
 │   ├── logs.js
 │   ├── npmcache.js
@@ -115,6 +115,7 @@ assistant-bot/
 │   ├── start.js
 │   ├── status.js
 │   ├── stop.js
+│   ├── update.js
 │   └── uptime.js
 ├── config/
 │   ├── env.js
@@ -122,6 +123,8 @@ assistant-bot/
 │   └── utils.js
 ├── handlers/
 │   └── textHandler.js
+├── scripts/
+│   └── deploy-web.sh
 ├── docs/
 │   ├── commands-guide.md
 │   ├── feature-matrix.md

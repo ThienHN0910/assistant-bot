@@ -16,13 +16,24 @@ module.exports = {
       description: 'npm run build',
       steps: [ { cmd: 'npm', args: ['run', 'build'] } ],
     },
-    deploy: {
-      description: 'Pull, install, build and restart processes',
+    update: {
+      description: 'Pull, install, build and restart processes to update the bot',
       steps: [
         { cmd: 'git', args: ['pull', 'origin', 'main'] },
         { cmd: 'npm', args: ['install'] },
         { cmd: 'npm', args: ['run', 'build'] },
         { cmd: 'pm2', args: ['restart', 'all'] },
+      ],
+    },
+    'deploy-web': {
+      description: 'Deploy static web (all-in-one step): deploy-web <project> <zip> <server>',
+      steps: [
+        {
+          cmd: 'bash',
+          args: ['./scripts/deploy-web.sh', '<project>', '<zip>', '<server>'],
+          requiresArg: true,
+          argNames: ['project', 'zip', 'server'],
+        },
       ],
     },
     'nginx-test': {

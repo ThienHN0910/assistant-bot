@@ -6,6 +6,19 @@ module.exports = {
   description: 'Báo cáo trạng thái server',
   execute: async (ctx) => {
     try {
+      const text = ctx.message?.text || '';
+      const args = text.trim().split(/\s+/).slice(1);
+      if (args.includes('-h') || args.includes('--help')) {
+        await ctx.replyWithHTML(
+          `ℹ️ <b>Hướng dẫn lệnh /status</b>\n` +
+          `Xem trạng thái tài nguyên phần cứng thời gian thực của máy chủ.\n\n` +
+          `<b>Cú pháp:</b> <code>/status</code>\n` +
+          `<b>Thông số trả về:</b> CPU (%), RAM (đã dùng/tổng), SWAP (đã dùng/tổng), dung lượng đĩa còn trống (/).\n` +
+          `<b>Ví dụ:</b> <code>/status</code>`
+        );
+        return;
+      }
+
       const [cpuLoad, memory, fileSystems] = await Promise.all([
         si.currentLoad(),
         si.mem(),

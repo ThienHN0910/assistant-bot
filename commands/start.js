@@ -3,6 +3,18 @@ module.exports = {
   description: 'Hiển thị menu hướng dẫn',
   execute: async (ctx) => {
     try {
+      const text = ctx.message?.text || '';
+      const args = text.trim().split(/\s+/).slice(1);
+      if (args.includes('-h') || args.includes('--help')) {
+        await ctx.replyWithHTML(
+          `ℹ️ <b>Hướng dẫn lệnh /start</b>\n` +
+          `Hiển thị danh sách tất cả các câu lệnh khả dụng của bot và bàn phím tương tác nhanh.\n\n` +
+          `<b>Cú pháp:</b> <code>/start</code>\n` +
+          `<b>Ví dụ:</b> <code>/start</code>`
+        );
+        return;
+      }
+
       const lines = [];
       // Sử dụng thẻ <b> để in đậm trong chế độ HTML
       lines.push('<b>👋 Chào mừng đến với Dev Assistant Bot</b>');
@@ -16,7 +28,8 @@ module.exports = {
       lines.push('• /uptime - Xem thời gian uptime của server');
       lines.push('• /cleancache - Dọn cache an toàn và flush log PM2');
       lines.push('• /npmcache - Dọn cache npm');
-      lines.push('• /deploy - Chạy trực tiếp chuỗi lệnh deploy tự động');
+      lines.push('• /update - Tự động cập nhật mã nguồn bot và khởi động lại');
+      lines.push('• /deploy-web - Triển khai website tĩnh/SPA trong 1 bước duy nhất');
       lines.push('• /sh - Chạy lệnh shell theo whitelist an toàn');
       lines.push('• /stop - Stop process PM2 của bot');
       lines.push('');
@@ -31,7 +44,7 @@ module.exports = {
           keyboard: [
             [{ text: '/status' }, { text: '/ip' }, { text: '/uptime' }],
             [{ text: '/logs' }, { text: '/cleancache' }, { text: '/npmcache' }],
-            [{ text: '/deploy' }, { text: '/stop' }, { text: '/sh' }]
+            [{ text: '/update' }, { text: '/stop' }, { text: '/sh' }]
           ],
           resize_keyboard: true,
           one_time_keyboard: false,

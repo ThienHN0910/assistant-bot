@@ -13,6 +13,18 @@ module.exports = {
     description: 'Xem thời gian uptime của server',
     async execute(ctx) {
         try {
+            const text = ctx.message?.text || '';
+            const args = text.trim().split(/\s+/).slice(1);
+            if (args.includes('-h') || args.includes('--help')) {
+                await ctx.replyWithHTML(
+                    `ℹ️ <b>Hướng dẫn lệnh /uptime</b>\n` +
+                    `Xem thời gian máy chủ đã hoạt động liên tục (uptime) và thời điểm boot máy chủ.\n\n` +
+                    `<b>Cú pháp:</b> <code>/uptime</code>\n` +
+                    `<b>Ví dụ:</b> <code>/uptime</code>`
+                );
+                return;
+            }
+
             // si.time() trả về dữ liệu đồng bộ (synchronous)
             const timeData = si.time();
             const uptimeSeconds = (timeData && typeof timeData.uptime === 'number') ? timeData.uptime : 0;
