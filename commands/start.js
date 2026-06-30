@@ -29,7 +29,7 @@ module.exports = {
       lines.push('• /cleancache - Dọn cache an toàn và flush log PM2');
       lines.push('• /npmcache - Dọn cache npm');
       lines.push('• /update - Tự động cập nhật mã nguồn bot và khởi động lại');
-      lines.push('• /deploy-web - Triển khai website tĩnh/SPA trong 1 bước duy nhất');
+      lines.push('• /deploy_web - Triển khai website tĩnh/SPA trong 1 bước duy nhất');
       lines.push('• /sh - Chạy lệnh shell theo whitelist an toàn');
       lines.push('• /stop - Stop process PM2 của bot');
       lines.push('');
@@ -44,7 +44,7 @@ module.exports = {
           keyboard: [
             [{ text: '/status' }, { text: '/ip' }, { text: '/uptime' }],
             [{ text: '/logs' }, { text: '/cleancache' }, { text: '/npmcache' }],
-            [{ text: '/update' }, { text: '/stop' }, { text: '/deploy-web -h' }]
+            [{ text: '/update' }, { text: '/stop' }, { text: '/deploy_web -h' }]
           ],
           resize_keyboard: true,
           one_time_keyboard: false,

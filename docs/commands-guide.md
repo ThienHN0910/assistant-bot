@@ -29,7 +29,7 @@ Do bot có khả năng thực thi các câu lệnh hệ thống và truy cập d
 Đây là các câu lệnh chính của bot được đăng ký trực tiếp và có thể gọi nhanh thông qua Menu hoặc gõ `/`.
 
 > [!TIP]
-> **Hỗ trợ cờ Trợ giúp (`-h` / `--help`)**: Bạn có thể thêm hậu tố `-h` hoặc `--help` vào sau **bất kỳ câu lệnh trực tiếp nào** để yêu cầu bot trả về chi tiết cú pháp hướng dẫn và ví dụ mẫu của riêng câu lệnh đó (ví dụ: `/deploy-web -h`).
+> **Hỗ trợ cờ Trợ giúp (`-h` / `--help`)**: Bạn có thể thêm hậu tố `-h` hoặc `--help` vào sau **bất kỳ câu lệnh trực tiếp nào** để yêu cầu bot trả về chi tiết cú pháp hướng dẫn và ví dụ mẫu của riêng câu lệnh đó (ví dụ: `/deploy_web -h`).
 
 ### `/start`
 *   **Chức năng**: Khởi động bot, hiển thị menu chào mừng và danh sách tất cả các lệnh khả dụng.
@@ -90,9 +90,9 @@ Do bot có khả năng thực thi các câu lệnh hệ thống và truy cập d
 *   **Cách dùng**: `/stop`
 *   **Chi tiết hoạt động**: Thực thi lệnh `pm2 stop <tên_tiến_trình>`. Tên tiến trình mặc định là `assistant-bot` hoặc được cấu hình thông qua biến môi trường `PM2_PROCESS_NAME`.
 
-### `/deploy-web`
+### `/deploy_web`
 *   **Chức năng**: Triển khai website tĩnh/SPA trong 1 bước duy nhất (sử dụng script Bash tự động).
-*   **Cách dùng**: `/deploy-web <tên_project> <tên_file_zip> <tên_domain_hoặc_IP>`
+*   **Cách dùng**: `/deploy_web <tên_project> <tên_file_zip> <tên_domain_hoặc_IP>`
 *   **Chi tiết hoạt động**: Thực thi script `bash ./scripts/deploy-web.sh <project> <zip> <server>` tự động xử lý toàn bộ: tạo thư mục, chuyển zip, giải nén, chmod, tạo Virtual Host Nginx, tạo symlink, test và reload Nginx.
 *   **Lưu ý**: Lệnh đòi hỏi truyền đầy đủ 3 tham số. Kết quả deploy chi tiết được trả về dưới dạng HTML. Nếu kết quả quá dài, bot sẽ gửi file đính kèm `deploy-<project>-output.txt`.
 
@@ -122,8 +122,8 @@ Dưới đây là mô tả chi tiết của từng alias trong whitelist:
 | **`git-pull`** | Kéo code mới nhất từ nhánh chính. | `git pull origin main` | `/sh /git-pull` |
 | **`npm-install`**| Cài đặt các thư viện phụ thuộc. | `npm install` | `/sh /npm-install` |
 | **`npm-build`**  | Build dự án sang chế độ sản xuất. | `npm run build` | `/sh /npm-build` |
-| **`update`**     | Cập nhật mã nguồn và khởi động lại bot. | Chạy tuần tự: `git pull origin main` $\to$ `npm install` $\to$ `npm run build` $\to$ `pm2 restart all`. | `/sh /update` *(Tương đương lệnh direct `/update`)* |
-| **`deploy-web`** | Triển khai website tĩnh/SPA trong 1 bước duy nhất (sử dụng script Bash). | Thực thi script `bash ./scripts/deploy-web.sh <project> <zip> <server>` tự động xử lý: tạo thư mục, chuyển zip, giải nén, chmod, tạo Virtual Host Nginx, tạo symlink, test và reload Nginx. | `/sh /deploy-web my-portfolio dist.zip mydomain.com`<br>*Tham số thứ tự: `[tên_project] [tên_file_zip] [tên_domain_hoặc_IP]`* |
+| **`update`**     | Cập nhật mã nguồn và khởi động lại bot. | Chạy tuần tự: `git pull origin main` $\to$ `npm install` (sau đó tự động khởi động lại bot bất đồng bộ). | `/sh /update` *(Tương đương lệnh direct `/update`)* |
+| **`deploy-web`** | Triển khai website tĩnh/SPA trong 1 bước duy nhất (sử dụng script Bash). | Thực thi script `bash ./scripts/deploy-web.sh <project> <zip> <server>` tự động xử lý: tạo thư mục, chuyển zip, giải nén, chmod, tạo Virtual Host Nginx, tạo symlink, test và reload Nginx. | `/sh /deploy-web my-portfolio dist.zip mydomain.com`<br>*Tham số thứ tự: `[tên_project] [tên_file_zip] [tên_domain_hoặc_IP]` (Tương đương lệnh direct `/deploy_web`)* |
 | **`nginx-test`** | Kiểm tra cú pháp file cấu hình Nginx. | `sudo nginx -t` (yêu cầu quyền sudo) | `/sh /nginx-test` |
 | **`nginx-reload`**| Tải lại cấu hình Nginx không downtime. | `sudo systemctl reload nginx` (yêu cầu quyền sudo) | `/sh /nginx-reload` |
 | **`nginx-status`**| Xem trạng thái hoạt động của Nginx. | `sudo systemctl status nginx` (yêu cầu quyền sudo) | `/sh /nginx-status` |

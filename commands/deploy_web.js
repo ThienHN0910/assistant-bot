@@ -24,8 +24,8 @@ function buildStepOutput(step, res) {
 }
 
 module.exports = {
-  name: 'deploy-web',
-  description: 'Triển khai website tĩnh/SPA trong một lệnh duy nhất: /deploy-web <project> <zip> <server>',
+  name: 'deploy_web',
+  description: 'Triển khai website tĩnh/SPA trong một lệnh duy nhất: /deploy_web <project> <zip> <server>',
   execute: async (ctx) => {
     try {
       const text = ctx.message?.text || '';
@@ -33,14 +33,14 @@ module.exports = {
 
       if (args.includes('-h') || args.includes('--help')) {
         await ctx.replyWithHTML(
-          `ℹ️ <b>Hướng dẫn lệnh /deploy-web</b>\n` +
+          `ℹ️ <b>Hướng dẫn lệnh /deploy_web</b>\n` +
           `Triển khai website tĩnh/SPA lên máy chủ Nginx chỉ trong một bước duy nhất bằng script Bash tự động.\n\n` +
-          `<b>Cú pháp:</b> <code>/deploy-web &lt;tên_project&gt; &lt;tên_file_zip&gt; &lt;tên_domain_hoặc_IP&gt;</code>\n` +
+          `<b>Cú pháp:</b> <code>/deploy_web &lt;tên_project&gt; &lt;tên_file_zip&gt; &lt;tên_domain_hoặc_IP&gt;</code>\n` +
           `<b>Tham số:</b>\n` +
           `- <code>&lt;tên_project&gt;</code>: Tên thư mục dự án tạo trong /home/hnt/web/.\n` +
           `- <code>&lt;tên_file_zip&gt;</code>: Tên file ZIP chứa bản build (ví dụ: dist.zip).\n` +
           `- <code>&lt;tên_domain_hoặc_IP&gt;</code>: Tên miền hoặc địa chỉ IP để cấu hình virtual host Nginx.\n\n` +
-          `<b>Ví dụ mẫu:</b> <code>/deploy-web portfolio-vue dist.zip mydomain.com</code>`
+          `<b>Ví dụ mẫu:</b> <code>/deploy_web portfolio-vue dist.zip mydomain.com</code>`
         );
         return;
       }
@@ -48,8 +48,8 @@ module.exports = {
       if (args.length < 3) {
         await ctx.replyWithHTML(
           `⚠️ <b>Thiếu tham số!</b>\n` +
-          `Cú pháp: <code>/deploy-web &lt;tên_project&gt; &lt;tên_file_zip&gt; &lt;tên_domain_hoặc_IP&gt;</code>\n\n` +
-          `Ví dụ: <code>/deploy-web portfolio-vue dist.zip mydomain.com</code>`
+          `Cú pháp: <code>/deploy_web &lt;tên_project&gt; &lt;tên_file_zip&gt; &lt;tên_domain_hoặc_IP&gt;</code>\n\n` +
+          `Ví dụ: <code>/deploy_web portfolio-vue dist.zip mydomain.com</code>`
         );
         return;
       }

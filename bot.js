@@ -12,7 +12,7 @@ const npmcacheCommand = require("./commands/npmcache");
 const shCommand = require("./commands/sh");
 const stopCommand = require("./commands/stop");
 const updateCommand = require("./commands/update");
-const deployWebCommand = require("./commands/deploy-web");
+const deployWebCommand = require("./commands/deploy_web");
 const { createTextHandler } = require("./handlers/textHandler");
 
 let bot;

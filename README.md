@@ -107,7 +107,7 @@ assistant-bot/
 ├── bot.js
 ├── commands/
 │   ├── cleancache.js
-│   ├── deploy-web.js
+│   ├── deploy_web.js
 │   ├── ip.js
 │   ├── logs.js
 │   ├── npmcache.js
