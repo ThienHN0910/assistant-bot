@@ -18,6 +18,7 @@ Tài liệu này phân loại tính năng của bot theo trạng thái để là
 | Command | `/ip` lấy IP public | implemented | Gọi dịch vụ ipify |
 | Command | `/logs` đọc 20 dòng log PM2 gần nhất | implemented | Cần cấu hình `PM2_ERROR_LOG_PATH` |
 | Command | `/uptime` xem uptime server | implemented | Có thêm thời điểm boot nếu lấy được |
+| Command | `/deploy` chạy deploy tự động | implemented | Thực thi chuỗi lệnh git pull, npm install, npm build, pm2 restart |
 | Notes | Lưu text thường vào file notes | implemented | Text không bắt đầu bằng `/` sẽ được append |
 | Runtime | Graceful shutdown | implemented | Xử lý `SIGINT` và `SIGTERM` |
 | Runtime | Bắt lỗi runtime không làm bot chết ngay | implemented | Có `bot.catch()` và try/catch ở command |
@@ -115,6 +116,6 @@ Khuyến nghị giữ lớp 3 ở trạng thái hạn chế hoặc không triể
 
 ## Kết luận kỹ thuật
 
-Bot hiện tại phù hợp như một trợ lý cá nhân cho dev: kiểm tra server, lấy IP, đọc log, xem uptime, ghi chú nhanh, liệt kê và đọc file, đổi thư mục làm việc, dọn cache theo bước cố định, dọn cache npm, điều khiển process PM2 cơ bản, và chạy shell whitelist.
+Bot hiện tại phù hợp như một trợ lý cá nhân cho dev: kiểm tra server, lấy IP, đọc log, xem uptime, ghi chú nhanh, liệt kê và đọc file, đổi thư mục làm việc, dọn cache theo bước cố định, dọn cache npm, điều khiển process PM2 cơ bản, chạy shell whitelist và deploy tự động một chạm.
 
 Các tính năng shell/maintenance đã được triển khai theo hướng an toàn, nhưng vẫn nên giữ kỷ luật bảo mật: whitelist chặt, output escape, và không mở rộng sang lệnh phá hủy nếu chưa có cơ chế kiểm soát riêng.

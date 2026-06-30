@@ -106,11 +106,9 @@ Lưu ý: dự án hiện chưa có bước transpile hoặc bundling, nên khôn
 assistant-bot/
 ├── bot.js
 ├── commands/
-│   ├── cat.js
-│   ├── cd.js
 │   ├── cleancache.js
+│   ├── deploy.js
 │   ├── ip.js
-│   ├── ls.js
 │   ├── logs.js
 │   ├── npmcache.js
 │   ├── sh.js
@@ -125,8 +123,10 @@ assistant-bot/
 ├── handlers/
 │   └── textHandler.js
 ├── docs/
+│   ├── commands-guide.md
 │   ├── feature-matrix.md
-│   └── shell-maintenance-spec.md
+│   ├── shell-maintenance-spec.md
+│   └── whitelist.md
 ├── .env.example
 ├── .gitignore
 ├── LICENSE
@@ -146,6 +146,7 @@ pm2 save
 
 ## Lưu ý
 
+- Xem [docs/commands-guide.md](docs/commands-guide.md) để đọc **hướng dẫn chi tiết cách dùng toàn bộ các câu lệnh** (bao gồm cả các lệnh chạy qua `/sh`).
 - Xem [docs/feature-matrix.md](docs/feature-matrix.md) để biết trạng thái hiện tại của bot và các tính năng an toàn đã được bổ sung.
 - Xem [docs/shell-maintenance-spec.md](docs/shell-maintenance-spec.md) để hiểu rõ whitelist shell, flow dọn cache, và các ràng buộc bảo mật của nhóm lệnh mới.
 - File ghi chú sẽ được tạo hoặc append tự động khi bot nhận text thường.

@@ -4,6 +4,7 @@ This document describes the shell command whitelist used by the bot. The bot exp
 
 Usage
 - From Telegram chat: `/sh /deploy` or `/sh /pm2-restart assistant-bot`
+- Shortcut: Bạn có thể chạy trực tiếp lệnh `/deploy` để thực hiện quá trình deploy (tương đương với `/sh /deploy`).
 - If no alias provided, the bot replies with the list of available aliases.
 
 Available aliases (configured in `config/whitelist.js`)

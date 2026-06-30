@@ -16,6 +16,7 @@ module.exports = {
       lines.push('• /uptime - Xem thời gian uptime của server');
       lines.push('• /cleancache - Dọn cache an toàn và flush log PM2');
       lines.push('• /npmcache - Dọn cache npm');
+      lines.push('• /deploy - Chạy trực tiếp chuỗi lệnh deploy tự động');
       lines.push('• /sh - Chạy lệnh shell theo whitelist an toàn');
       lines.push('• /stop - Stop process PM2 của bot');
       lines.push('');
@@ -30,7 +31,7 @@ module.exports = {
           keyboard: [
             [{ text: '/status' }, { text: '/ip' }, { text: '/uptime' }],
             [{ text: '/logs' }, { text: '/cleancache' }, { text: '/npmcache' }],
-            [ { text: '/stop' }, { text: '/sh' }]
+            [{ text: '/deploy' }, { text: '/stop' }, { text: '/sh' }]
           ],
           resize_keyboard: true,
           one_time_keyboard: false,
