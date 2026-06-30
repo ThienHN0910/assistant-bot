@@ -17,12 +17,10 @@ module.exports = {
       steps: [ { cmd: 'npm', args: ['run', 'build'] } ],
     },
     update: {
-      description: 'Pull, install, build and restart processes to update the bot',
+      description: 'Pull and install updates for the bot',
       steps: [
         { cmd: 'git', args: ['pull', 'origin', 'main'] },
         { cmd: 'npm', args: ['install'] },
-        { cmd: 'npm', args: ['run', 'build'] },
-        { cmd: 'pm2', args: ['restart', 'all'] },
       ],
     },
     'deploy-web': {

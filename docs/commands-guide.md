@@ -88,7 +88,7 @@ Do bot có khả năng thực thi các câu lệnh hệ thống và truy cập d
 ### `/stop`
 *   **Chức năng**: Dừng tiến trình PM2 của bot từ xa.
 *   **Cách dùng**: `/stop`
-*   **Chi tiết hoạt động**: Thực thi lệnh `pm2 stop <tên_tiến_trình>`. Tên tiến trình mặc định là `dev-assistant-bot` hoặc được cấu hình thông qua biến môi trường `PM2_PROCESS_NAME`.
+*   **Chi tiết hoạt động**: Thực thi lệnh `pm2 stop <tên_tiến_trình>`. Tên tiến trình mặc định là `assistant-bot` hoặc được cấu hình thông qua biến môi trường `PM2_PROCESS_NAME`.
 
 ### `/deploy-web`
 *   **Chức năng**: Triển khai website tĩnh/SPA trong 1 bước duy nhất (sử dụng script Bash tự động).
@@ -173,8 +173,8 @@ TIMEZONE=Asia/Ho_Chi_Minh
 NOTES_FILE_PATH=./notes.txt
 
 # Đường dẫn tuyệt đối hoặc tương đối tới file log lỗi của PM2 (dùng cho lệnh /logs)
-PM2_ERROR_LOG_PATH=C:\Users\Username\.pm2\logs\dev-assistant-bot-error.log
+PM2_ERROR_LOG_PATH=C:\Users\Username\.pm2\logs\assistant-bot-error.log
 
 # Tên của tiến trình PM2 quản lý bot (dùng cho lệnh /stop)
-PM2_PROCESS_NAME=dev-assistant-bot
+PM2_PROCESS_NAME=assistant-bot
 ```

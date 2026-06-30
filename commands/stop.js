@@ -68,7 +68,7 @@ module.exports = {
         return;
       }
 
-      const processName = process.env.PM2_PROCESS_NAME || 'dev-assistant-bot';
+      const processName = process.env.PM2_PROCESS_NAME || 'assistant-bot';
       const command = `pm2 stop ${processName}`;
       const result = await runCommand(command);
 

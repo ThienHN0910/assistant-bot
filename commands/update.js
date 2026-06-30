@@ -63,6 +63,11 @@ module.exports = {
       const escaped = escapeHtml(output);
 
       // Gửi kết quả
+      let success = true;
+      for (const res of results) {
+        if (!res.ok) success = false;
+      }
+
       try {
         if (escaped.length <= 3500) {
           await ctx.replyWithHTML(`✅ <b>Hoàn thành Cập nhật! Kết quả chi tiết:</b>\n<pre>${escaped}</pre>`);
@@ -70,6 +75,18 @@ module.exports = {
           await ctx.replyWithHTML('✅ <b>Hoàn thành Cập nhật!</b> Kết quả quá dài, gửi dưới dạng file đính kèm.');
           const buffer = Buffer.from(output, 'utf8');
           await ctx.replyWithDocument({ source: buffer, filename: `update-output.txt` });
+        }
+
+        if (success) {
+          await ctx.replyWithHTML(`🔄 <b>Đang khởi động lại Bot để áp dụng thay đổi...</b>\n<i>Tiến trình sẽ hoạt động trở lại sau vài giây.</i>`);
+          
+          setTimeout(() => {
+            const { exec } = require('child_process');
+            const processName = process.env.PM2_PROCESS_NAME || 'assistant-bot';
+            exec(`pm2 restart ${processName}`, (err) => {
+              if (err) console.error('[PM2_RESTART_ERROR]', err);
+            });
+          }, 1500);
         }
       } catch (sendErr) {
         console.error('[UPDATE_REPLY_ERROR]', sendErr);

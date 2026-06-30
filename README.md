@@ -80,11 +80,11 @@ Tham khảo file [.env.example](.env.example).
 - `NOTES_FILE_PATH`:
   - Đường dẫn file ghi chú cục bộ, mặc định là `./notes.txt`
 - `PM2_PROCESS_NAME`:
-  - Tên process PM2 để dùng cho `/stop`, mặc định là `dev-assistant-bot`
+  - Tên process PM2 để dùng cho `/stop`, mặc định là `assistant-bot`
 
 Ví dụ `PM2_ERROR_LOG_PATH`:
-- Linux: `/home/ubuntu/.pm2/logs/dev-assistant-bot-error.log`
-- Windows: `C:/Users/<user>/.pm2/logs/dev-assistant-bot-error.log`
+- Linux: `/home/ubuntu/.pm2/logs/assistant-bot-error.log`
+- Windows: `C:/Users/<user>/.pm2/logs/assistant-bot-error.log`
 
 ## Scripts
 
@@ -141,9 +141,9 @@ assistant-bot/
 
 ```bash
 npm install -g pm2
-pm2 start bot.js --name dev-assistant-bot
+pm2 start bot.js --name assistant-bot
 pm2 status
-pm2 logs dev-assistant-bot
+pm2 logs assistant-bot
 pm2 save
 ```
 
