@@ -44,7 +44,7 @@ module.exports = {
           keyboard: [
             [{ text: '/status' }, { text: '/ip' }, { text: '/uptime' }],
             [{ text: '/logs' }, { text: '/cleancache' }, { text: '/npmcache' }],
-            [{ text: '/update' }, { text: '/stop' }, { text: '/sh' }]
+            [{ text: '/update' }, { text: '/stop' }, { text: '/update' }]
           ],
           resize_keyboard: true,
           one_time_keyboard: false,
