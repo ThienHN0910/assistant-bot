@@ -1,3 +1,4 @@
+const fsSync = require('fs');
 const path = require('path');
 const axios = require('axios');
 const sandbox = require('../lib/sandbox');
@@ -14,7 +15,13 @@ async function getPublicIp() {
 
 async function handleDeployExecution(ctx, zipName, config, requestedPort = null) {
   try {
-    const zipPath = path.join(config.uploadDir, zipName);
+    let zipPath = path.join(config.uploadDir, zipName);
+    if (!fsSync.existsSync(zipPath)) {
+      const parentZip = path.join(path.dirname(config.uploadDir), zipName);
+      if (fsSync.existsSync(parentZip)) {
+        zipPath = parentZip;
+      }
+    }
     const projectName = path.parse(zipName).name;
     const port = requestedPort || (await sandbox.getNextAvailablePort(config.webDeployDir, config.webPortStart));
 
