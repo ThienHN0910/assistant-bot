@@ -12,6 +12,9 @@ const cleanCacheCommand = require("./commands/cleancache");
 const restartCommand = require("./commands/restart");
 const shCommand = require("./commands/sh");
 const updateCommand = require("./commands/update");
+const deployCommand = require("./commands/deploy");
+const webListCommand = require("./commands/web_list");
+const webRemoveCommand = require("./commands/web_remove");
 const deployWebCommand = require("./commands/deploy_web");
 const { createTextHandler } = require("./handlers/textHandler");
 const { startWatchdog, stopWatchdog } = require("./services/watchdog");
@@ -39,6 +42,9 @@ async function startBot() {
       restartCommand,
       shCommand,
       updateCommand,
+      deployCommand,
+      webListCommand,
+      webRemoveCommand,
       deployWebCommand,
     ];
 
@@ -48,6 +54,9 @@ async function startBot() {
       if (mod.name && typeof mod.execute === "function") {
         try {
           bot.command(mod.name, (ctx) => mod.execute(ctx, config));
+          if (typeof mod.register === "function") {
+            mod.register(bot, config);
+          }
           console.log(`📡 Đã nạp thành công lệnh: /${mod.name}`);
         } catch (err) {
           console.error(

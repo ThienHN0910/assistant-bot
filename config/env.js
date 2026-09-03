@@ -32,12 +32,20 @@ function getConfig() {
   const notesFilePath = toAbsolutePath(process.env.NOTES_FILE_PATH || './notes.txt');
   const pm2ErrorLogPath = toAbsolutePath(requireEnv('PM2_ERROR_LOG_PATH'));
 
+  // Cấu hình Web Sandbox & Deploy
+  const webDeployDir = toAbsolutePath(process.env.WEB_DEPLOY_DIR || '/home/hnt/web');
+  const uploadDir = toAbsolutePath(process.env.UPLOAD_DIR || '/home/hnt/uploads');
+  const webPortStart = Number(process.env.WEB_PORT_START) || 8081;
+
   return {
     botToken,
     authorizedTelegramId,
     timezone,
     notesFilePath,
     pm2ErrorLogPath,
+    webDeployDir,
+    uploadDir,
+    webPortStart,
   };
 }
 
