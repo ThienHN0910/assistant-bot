@@ -1,4 +1,5 @@
 const fs = require('fs/promises');
+const { execFile } = require('child_process');
 
 function escapeHtml(value) {
   return String(value)
@@ -9,14 +10,50 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+/**
+ * Đọc N dòng cuối của file một cách an toàn cho bộ nhớ (OOM-safe trên VPS 1GB RAM).
+ * Ưu tiên dùng lệnh `tail -n` trên Linux/Unix để không tốn bộ nhớ Node.js.
+ * Fallback: Đọc tối đa 64KB từ đuôi file qua seek position, không bao giờ nạp cả file lớn vào RAM.
+ */
 async function readLastLines(filePath, lineCount = 20) {
-  const content = await fs.readFile(filePath, 'utf8');
-  const lines = content.split(/\r?\n/);
-  // Loại bỏ dòng rỗng ở cuối file để đảm bảo trả về đúng số dòng log thực tế.
-  while (lines.length && lines[lines.length - 1] === '') {
-    lines.pop();
+  if (process.platform !== 'win32') {
+    try {
+      return await new Promise((resolve, reject) => {
+        execFile('tail', ['-n', String(lineCount), filePath], { maxBuffer: 1024 * 1024 }, (error, stdout) => {
+          if (error) return reject(error);
+          resolve((stdout || '').trimEnd());
+        });
+      });
+    } catch {
+      // Fallback xuống đọc chunk cuối nếu tail gặp sự cố
+    }
   }
-  return lines.slice(-lineCount).join('\n');
+
+  // Fallback seek buffer an toàn
+  let handle;
+  try {
+    handle = await fs.open(filePath, 'r');
+    const stat = await handle.stat();
+    if (stat.size === 0) return '';
+
+    const maxChunk = 64 * 1024; // 64KB
+    const readLength = Math.min(stat.size, maxChunk);
+    const position = stat.size - readLength;
+    const buffer = Buffer.alloc(readLength);
+
+    await handle.read(buffer, 0, readLength, position);
+    const text = buffer.toString('utf8');
+    const lines = text.split(/\r?\n/);
+
+    while (lines.length && lines[lines.length - 1] === '') {
+      lines.pop();
+    }
+    return lines.slice(-lineCount).join('\n');
+  } finally {
+    if (handle) {
+      await handle.close().catch(() => {});
+    }
+  }
 }
 
 function formatBytes(bytes) {
