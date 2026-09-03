@@ -31,6 +31,7 @@ module.exports = {
       lines.push('• /deploy - Triển khai web test từ file ZIP (1 chạm)');
       lines.push('• /web_list - Xem danh sách web test đang host');
       lines.push('• /web_remove - Gỡ bỏ web test khỏi server');
+      lines.push('• /perf - Đo độ trễ TTFB và điểm Google PageSpeed');
       lines.push('• /restart - Khởi động lại bot từ xa qua PM2 an toàn');
       lines.push('• /update - Tự động cập nhật mã nguồn bot và khởi động lại');
       lines.push('• /sh - Chạy lệnh shell theo whitelist an toàn');
@@ -43,8 +44,8 @@ module.exports = {
         reply_markup: {
           keyboard: [
             [{ text: '/status' }, { text: '/ps' }, { text: '/uptime' }],
-            [{ text: '/deploy' }, { text: '/web_list' }, { text: '/notes' }],
-            [{ text: '/logs' }, { text: '/cleancache' }, { text: '/ip' }],
+            [{ text: '/deploy' }, { text: '/web_list' }, { text: '/perf -h' }],
+            [{ text: '/logs' }, { text: '/cleancache' }, { text: '/notes' }],
             [{ text: '/restart' }, { text: '/update' }, { text: '/sh -h' }],
           ],
           resize_keyboard: true,

@@ -15,6 +15,7 @@ const updateCommand = require("./commands/update");
 const deployCommand = require("./commands/deploy");
 const webListCommand = require("./commands/web_list");
 const webRemoveCommand = require("./commands/web_remove");
+const perfCommand = require("./commands/perf");
 const deployWebCommand = require("./commands/deploy_web");
 const { createTextHandler } = require("./handlers/textHandler");
 const { startWatchdog, stopWatchdog } = require("./services/watchdog");
@@ -45,6 +46,7 @@ async function startBot() {
       deployCommand,
       webListCommand,
       webRemoveCommand,
+      perfCommand,
       deployWebCommand,
     ];
 
