@@ -8,9 +8,8 @@ const logsCommand = require("./commands/logs");
 const uptimeCommand = require("./commands/uptime");
 // `ls`, `cd`, `cat` moved into `sh` whitelist aliases; individual command files removed
 const cleanCacheCommand = require("./commands/cleancache");
-const npmcacheCommand = require("./commands/npmcache");
+const restartCommand = require("./commands/restart");
 const shCommand = require("./commands/sh");
-const stopCommand = require("./commands/stop");
 const updateCommand = require("./commands/update");
 const deployWebCommand = require("./commands/deploy_web");
 const { createTextHandler } = require("./handlers/textHandler");
@@ -33,9 +32,8 @@ async function startBot() {
       logsCommand,
       uptimeCommand,
       cleanCacheCommand,
-      npmcacheCommand,
+      restartCommand,
       shCommand,
-      stopCommand,
       updateCommand,
       deployWebCommand,
     ];
