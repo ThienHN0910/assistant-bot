@@ -6,13 +6,15 @@ const statusCommand = require("./commands/status");
 const ipCommand = require("./commands/ip");
 const logsCommand = require("./commands/logs");
 const uptimeCommand = require("./commands/uptime");
-// `ls`, `cd`, `cat` moved into `sh` whitelist aliases; individual command files removed
+const psCommand = require("./commands/ps");
+const notesCommand = require("./commands/notes");
 const cleanCacheCommand = require("./commands/cleancache");
 const restartCommand = require("./commands/restart");
 const shCommand = require("./commands/sh");
 const updateCommand = require("./commands/update");
 const deployWebCommand = require("./commands/deploy_web");
 const { createTextHandler } = require("./handlers/textHandler");
+const { startWatchdog, stopWatchdog } = require("./services/watchdog");
 
 let bot;
 
@@ -31,6 +33,8 @@ async function startBot() {
       ipCommand,
       logsCommand,
       uptimeCommand,
+      psCommand,
+      notesCommand,
       cleanCacheCommand,
       restartCommand,
       shCommand,
@@ -41,10 +45,8 @@ async function startBot() {
     for (const mod of modules) {
       if (!mod) continue;
 
-      // ÉP BUỘC CHẠY THEO CHUẨN OBJECT MỚI { name, execute }
       if (mod.name && typeof mod.execute === "function") {
         try {
-          // Fix truyền tham số: Truyền config độc lập để các file như logs.js đọc được pm2ErrorLogPath
           bot.command(mod.name, (ctx) => mod.execute(ctx, config));
           console.log(`📡 Đã nạp thành công lệnh: /${mod.name}`);
         } catch (err) {
@@ -56,7 +58,6 @@ async function startBot() {
         continue;
       }
 
-      // Nếu phát hiện file nào cứng đầu chưa chuyển sang Object
       if (typeof mod === "function") {
         console.error(
           `[BOT_MODULE_ERROR] Phát hiện file lệnh viết dạng function cũ! Hãy chuyển sang Object { name, execute }.`,
@@ -79,14 +80,19 @@ async function startBot() {
 
     await bot.launch({ dropPendingUpdates: true });
     console.log("✅ Dev Assistant Bot đang chạy mượt mà...");
+
+    // Kích hoạt service giám sát tự động (watchdog)
+    startWatchdog(bot, config);
   } catch (error) {
     console.error("[BOT_STARTUP_ERROR]", error);
     process.exitCode = 1;
   }
 }
+
 async function gracefulShutdown(signal) {
   try {
     console.log(`⏳ Nhận tín hiệu ${signal}, đang tắt bot an toàn...`);
+    stopWatchdog();
     if (bot) {
       await bot.stop(signal);
     }

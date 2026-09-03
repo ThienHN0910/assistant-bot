@@ -22,10 +22,12 @@ module.exports = {
       lines.push('<b>📋 Danh sách lệnh:</b>');
       lines.push('• /start - Hiển thị menu hướng dẫn');
       lines.push('• /status - Xem tài nguyên server realtime');
+      lines.push('• /ps - Xem top 5 tiến trình ngốn RAM & CPU');
       lines.push('• /ip - Lấy IP public hiện tại');
       lines.push('• /logs - Xem 20 dòng log lỗi PM2 gần nhất (OOM-safe)');
       lines.push('• /uptime - Xem thời gian uptime của server');
       lines.push('• /cleancache - Dọn cache an toàn và flush log PM2');
+      lines.push('• /notes - Xem 10 ghi chú gần nhất (hoặc /notes clear)');
       lines.push('• /restart - Khởi động lại bot từ xa qua PM2 an toàn');
       lines.push('• /update - Tự động cập nhật mã nguồn bot và khởi động lại');
       lines.push('• /deploy_web - Triển khai website tĩnh/SPA trong 1 bước duy nhất');
@@ -38,9 +40,10 @@ module.exports = {
         parse_mode: 'HTML',
         reply_markup: {
           keyboard: [
-            [{ text: '/status' }, { text: '/ip' }, { text: '/uptime' }],
-            [{ text: '/logs' }, { text: '/cleancache' }, { text: '/restart' }],
-            [{ text: '/update' }, { text: '/sh -h' }, { text: '/deploy_web -h' }],
+            [{ text: '/status' }, { text: '/ps' }, { text: '/uptime' }],
+            [{ text: '/logs' }, { text: '/notes' }, { text: '/ip' }],
+            [{ text: '/cleancache' }, { text: '/restart' }, { text: '/sh -h' }],
+            [{ text: '/update' }, { text: '/deploy_web -h' }],
           ],
           resize_keyboard: true,
           one_time_keyboard: false,
