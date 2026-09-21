@@ -1,7 +1,12 @@
 # Dev Assistant Bot
 
+[![Case Study](https://img.shields.io/badge/Case_Study-Portfolio-007ACC?style=flat-square&logo=vercel)](https://thienhn0910.vercel.app/projects/assisstantbot-telegram-overview)
+[![Blog](https://img.shields.io/badge/Blog-VPS_Orchestration-orange?style=flat-square)](https://thienhn0910.vercel.app/blog/zero-overhead-vps-orchestration-telegram-bot-pm2-nginx)
+[![Author](https://img.shields.io/badge/Author-thienhn0910-4FC08D?style=flat-square)](https://thienhn0910.vercel.app/)
+
 Telegram Dev Assistant & Web Sandbox Suite cho lập trình viên, xây dựng bằng Node.js và Telegraf.  
-Được tối ưu hóa đặc biệt cho máy chủ cấu hình thấp (GCP 1 vCPU / 1 GB RAM e2-micro/f1-micro) chạy dưới sự quản lý của PM2.
+Được tối ưu hóa đặc biệt cho máy chủ cấu hình thấp (GCP 1 vCPU / 1 GB RAM e2-micro/f1-micro) chạy dưới sự quản lý của PM2.  
+Dự án được phát triển và lưu trữ trong portfolio kỹ thuật của [Thien Nguyen](https://thienhn0910.vercel.app/).
 
 ---
 
@@ -142,3 +147,13 @@ assistant-bot/
 ├── package.json
 └── README.md
 ```
+
+---
+
+## 🌐 Case Study & Kỹ thuật chuyên sâu
+
+Dự án này là một phần trong danh mục giải pháp DevOps & Bot Automation của [Thien Nguyen](https://thienhn0910.vercel.app/):
+- 📌 **Chi tiết Case Study dự án**: [Assistant Bot Telegram Overview](https://thienhn0910.vercel.app/projects/assisstantbot-telegram-overview)
+- 📖 **Bài viết chuyên sâu về kiến trúc**: [Zero-Overhead VPS Orchestration: Telegram Bot + PM2 + Nginx](https://thienhn0910.vercel.app/blog/zero-overhead-vps-orchestration-telegram-bot-pm2-nginx)
+- ⚖️ **So sánh kiến trúc Bot**: [Bot Engineering Showdown: Facebook Webhooks vs Telegram API](https://thienhn0910.vercel.app/blog/bot-engineering-showdown-facebook-webhooks-vs-telegram-api)
+- 🚀 **Khám phá thêm các dự án khác**: [Portfolio Projects Showcase](https://thienhn0910.vercel.app/projects)
