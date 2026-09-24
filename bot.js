@@ -19,6 +19,7 @@ const perfCommand = require("./commands/perf");
 const deployWebCommand = require("./commands/deploy_web");
 const { createTextHandler } = require("./handlers/textHandler");
 const { startWatchdog, stopWatchdog } = require("./services/watchdog");
+const { startDashboardServer, stopDashboardServer } = require("./services/dashboardApi");
 
 let bot;
 
@@ -94,6 +95,9 @@ async function startBot() {
 
     // Kích hoạt service giám sát tự động (watchdog)
     startWatchdog(bot, config);
+
+    // Kích hoạt Web Dashboard API Server
+    startDashboardServer(config);
   } catch (error) {
     console.error("[BOT_STARTUP_ERROR]", error);
     process.exitCode = 1;
@@ -104,6 +108,7 @@ async function gracefulShutdown(signal) {
   try {
     console.log(`⏳ Nhận tín hiệu ${signal}, đang tắt bot an toàn...`);
     stopWatchdog();
+    stopDashboardServer();
     if (bot) {
       await bot.stop(signal);
     }
