@@ -90,13 +90,38 @@ Do bot có khả năng thực thi các câu lệnh hệ thống và truy cập d
 *   **Cách dùng**: `/stop`
 *   **Chi tiết hoạt động**: Thực thi lệnh `pm2 stop <tên_tiến_trình>`. Tên tiến trình mặc định là `assistant-bot` hoặc được cấu hình thông qua biến môi trường `PM2_PROCESS_NAME`.
 
-### `/deploy_web`
-*   **Chức năng**: Triển khai website tĩnh/SPA trong 1 bước duy nhất (sử dụng script Bash tự động).
-*   **Cách dùng**: `/deploy_web <tên_project> <tên_file_zip> <tên_domain_hoặc_IP>`
-*   **Chi tiết hoạt động**: Thực thi script `bash ./scripts/deploy-web.sh <project> <zip> <server>` tự động xử lý toàn bộ: tạo thư mục, chuyển zip, giải nén, chmod, tạo Virtual Host Nginx, tạo symlink, test và reload Nginx.
-*   **Lưu ý**: Lệnh đòi hỏi truyền đầy đủ 3 tham số. Kết quả deploy chi tiết được trả về dưới dạng HTML. Nếu kết quả quá dài, bot sẽ gửi file đính kèm `deploy-<project>-output.txt`.
+### `/deploy`
+*   **Chức năng**: Tự động triển khai ứng dụng đa nền tảng (VPS Nginx, Vercel, Render) kèm cấp tự động Subdomain `https://<tên_dự_án>.<base_domain>`.
+*   **Cách dùng**:
+    *   **Cách 1 (Bấm nút trên Telegram)**: Gõ `/deploy` để hiện danh sách các file `.zip` có sẵn trong thư mục upload, bấm chọn file và chọn nền tảng (`VPS` hoặc `Vercel`).
+    *   **Cách 2 (Gõ lệnh trực tiếp)**: `/deploy <tên_file.zip> [vps|vercel]`
+*   **Chi tiết hoạt động**:
+    *   **Trên VPS**: Tự động giải nén, phát hiện loại dự án (Web tĩnh hoặc Node.js Backend PM2), sinh Virtual Host Nginx với `server_name <dự_án>.<base_domain>` cổng 80/443, tận dụng Cloudflare Wildcard DNS.
+    *   **Trên Vercel**: Tự động tạo project, gán subdomain và gọi Cloudflare API tạo CNAME record trỏ về `cname.vercel-dns.com`.
+
+### Nhận diện thông minh link GitHub công khai
+*   **Chức năng**: Triển khai mã nguồn từ bất kỳ kho lưu trữ GitHub công khai nào trực tiếp từ khung chat Telegram.
+*   **Cách dùng**: Chỉ cần copy và dán đường link GitHub (ví dụ: `https://github.com/owner/my-react-app`) vào bot.
+*   **Chi tiết hoạt động**:
+    *   Bot nhận diện URL GitHub, tự động tạo đề xuất subdomain.
+    *   Hiển thị bàn phím nút bấm chọn nền tảng: `[ ▲ Deploy lên Vercel ]` hoặc `[ 🟣 Deploy lên Render ]`.
+    *   *Lưu ý bảo mật*: Link GitHub công khai không được phép deploy trực tiếp lên VPS để đảm bảo an toàn tuyệt đối cho máy chủ.
+
+### `/web_list`
+*   **Chức năng**: Liệt kê toàn bộ các dự án đang hoạt động trên cả VPS và Cloud (Vercel, Render) kèm tên miền HTTPS và dung lượng.
+*   **Cách dùng**: `/web_list`
+
+### `/web_remove`
+*   **Chức năng**: Gỡ bỏ dự án, dừng tiến trình PM2, xóa Virtual Host / Cloud Service và thu hồi CNAME DNS trên Cloudflare.
+*   **Cách dùng**: `/web_remove <tên_dự_án>`
+
+### Web Dashboard Vue 3 (`https://dashboard.<base_domain>`)
+*   **Chức năng**: Giao diện đồ họa Vue 3 Single Page Application xem trực quan tình trạng phần cứng máy chủ (CPU, RAM, Disk, Uptime) và danh sách tất cả các ứng dụng đã triển khai.
+*   **Bảo mật**: Khóa bằng mã PIN / Secret Token cấu hình tại `DASHBOARD_SECRET_KEY`.
+*   **Hỗ trợ**: Tìm kiếm, lọc theo nền tảng (VPS / Vercel / Render), mở nhanh trang web và xóa dự án chỉ với 1 click.
 
 ---
+
 
 ## 3. Lệnh `/sh` và Danh Sách Whitelist Aliases
 
