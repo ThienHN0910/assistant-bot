@@ -1,19 +1,11 @@
 const fsSync = require('fs');
 const path = require('path');
-const axios = require('axios');
+const deployer = require('../lib/deployer');
 const sandbox = require('../lib/sandbox');
+const deployStore = require('../lib/deployStore');
 const { escapeHtml } = require('../config/utils');
 
-async function getPublicIp() {
-  try {
-    const res = await axios.get('https://api.ipify.org?format=json', { timeout: 3000 });
-    return res.data?.ip || 'localhost';
-  } catch {
-    return 'localhost';
-  }
-}
-
-async function handleDeployExecution(ctx, zipName, config, requestedPort = null) {
+async function handleZipDeploy(ctx, zipName, target = 'vps', config, requestedPort = null) {
   try {
     let zipPath = path.join(config.uploadDir, zipName);
     if (!fsSync.existsSync(zipPath)) {
@@ -22,41 +14,96 @@ async function handleDeployExecution(ctx, zipName, config, requestedPort = null)
         zipPath = parentZip;
       }
     }
+
     const projectName = path.parse(zipName).name;
-    const port = requestedPort || (await sandbox.getNextAvailablePort(config.webDeployDir, config.webPortStart));
 
     await ctx.replyWithHTML(
       `⚙️ <b>Đang tiến hành Deploy dự án "${escapeHtml(projectName)}"...</b>\n` +
       `• File: <code>${escapeHtml(zipName)}</code>\n` +
-      `• Cấp phát Port: <b>${port}</b>\n` +
-      `<i>Vui lòng đợi vài giây...</i>`
+      `• Nền tảng: <b>${escapeHtml(target.toUpperCase())}</b>\n` +
+      `<i>Vui lòng đợi vài giây trong khi thiết lập...</i>`
     );
 
-    const result = await sandbox.deployProject(zipPath, projectName, port, config);
-    const publicIp = await getPublicIp();
-    const url = result.url || (result.domain ? `https://${result.domain}` : `http://${publicIp}:${result.port}`);
+    const result = await deployer.deploy(
+      {
+        source: 'zip_upload',
+        sourcePath: zipPath,
+        projectName,
+        target,
+        port: requestedPort,
+      },
+      config
+    );
+
+    const dep = result.deployment;
 
     await ctx.replyWithHTML(
       `🎉 <b>DEPLOY THÀNH CÔNG!</b>\n\n` +
-      `• Dự án: <b>${escapeHtml(result.name)}</b>\n` +
-      `• Nền tảng: <code>VPS (Nginx)</code>\n` +
-      `• Loại hình: <code>${result.type === 'backend' ? 'Node.js Backend' : 'Web Tĩnh / SPA'}</code>\n` +
-      (result.domain ? `• Tên miền: <code>${escapeHtml(result.domain)}</code>\n` : '') +
-      `• URL truy cập: <a href="${url}">${url}</a>\n\n` +
+      `• Dự án: <b>${escapeHtml(dep.name)}</b>\n` +
+      `• Nền tảng: <code>${dep.target.toUpperCase()}</code>\n` +
+      `• Loại hình: <code>${dep.type === 'backend' ? 'Node.js Backend' : 'Web Tĩnh / SPA'}</code>\n` +
+      `• Tên miền: <code>${escapeHtml(dep.domain || '')}</code>\n` +
+      `• URL truy cập: <a href="${dep.url}">${dep.url}</a>\n\n` +
       `<i>Tiện ích tiếp theo:</i>\n` +
-      `• Kiểm tra hiệu năng: <code>/perf ${result.port || result.name}</code>\n` +
+      (dep.port ? `• Kiểm tra hiệu năng: <code>/perf ${dep.port}</code>\n` : '') +
       `• Xem danh sách web: <code>/web_list</code>\n` +
-      `• Gỡ bỏ web khi xong: <code>/web_remove ${result.name}</code>`
+      `• Gỡ bỏ web khi xong: <code>/web_remove ${dep.name}</code>`
     );
   } catch (err) {
-    console.error('[DEPLOY_EXECUTION_ERROR]', err);
+    console.error('[DEPLOY_ZIP_EXECUTION_ERROR]', err);
     await ctx.replyWithHTML(`❌ <b>Lỗi khi deploy:</b> ${escapeHtml(err.message || String(err))}`);
+  }
+}
+
+async function handleGitDeploy(ctx, deployId, target, config) {
+  try {
+    const pending = deployStore.getPending(deployId);
+    if (!pending) {
+      await ctx.replyWithHTML('⚠️ <i>Yêu cầu deploy đã hết hạn hoặc không tồn tại. Vui lòng dán lại link GitHub.</i>');
+      return;
+    }
+
+    await ctx.replyWithHTML(
+      `⚙️ <b>Đang triển khai kho lưu trữ GitHub "${escapeHtml(pending.projectName)}"...</b>\n` +
+      `• Nền tảng: <b>${escapeHtml(target.toUpperCase())}</b>\n` +
+      `• Repo: <code>${escapeHtml(pending.repoUrl)}</code>\n` +
+      `<i>Đang tạo service và kết nối tên miền...</i>`
+    );
+
+    const result = await deployer.deploy(
+      {
+        source: 'github_public',
+        repoUrl: pending.repoUrl,
+        projectName: pending.projectName,
+        target,
+        subdomain: pending.subdomain,
+      },
+      config
+    );
+
+    deployStore.deletePending(deployId);
+    const dep = result.deployment;
+
+    await ctx.replyWithHTML(
+      `🎉 <b>DEPLOY GITHUB THÀNH CÔNG!</b>\n\n` +
+      `• Dự án: <b>${escapeHtml(dep.name)}</b>\n` +
+      `• Nền tảng: <code>${dep.target.toUpperCase()}</code>\n` +
+      `• Nguồn: <code>${escapeHtml(dep.sourceDetail || pending.repoUrl)}</code>\n` +
+      `• Tên miền: <code>${escapeHtml(dep.domain)}</code>\n` +
+      `• URL truy cập: <a href="${dep.url}">${dep.url}</a>\n\n` +
+      `<i>Tiện ích tiếp theo:</i>\n` +
+      `• Xem danh sách web: <code>/web_list</code>\n` +
+      `• Gỡ bỏ web khi xong: <code>/web_remove ${dep.name}</code>`
+    );
+  } catch (err) {
+    console.error('[DEPLOY_GIT_EXECUTION_ERROR]', err);
+    await ctx.replyWithHTML(`❌ <b>Lỗi khi deploy lên ${escapeHtml(target.toUpperCase())}:</b> ${escapeHtml(err.message || String(err))}`);
   }
 }
 
 module.exports = {
   name: 'deploy',
-  description: 'Deploy web cá nhân chỉ với 1 thao tác (hỗ trợ chọn file ZIP)',
+  description: 'Deploy web cá nhân với 1 chạm (hỗ trợ chọn ZIP hoặc dán link GitHub)',
   execute: async (ctx, config) => {
     try {
       const text = ctx.message?.text || '';
@@ -65,32 +112,29 @@ module.exports = {
       if (args.includes('-h') || args.includes('--help')) {
         await ctx.replyWithHTML(
           `ℹ️ <b>Hướng dẫn lệnh /deploy</b>\n` +
-          `Tự động giải nén, phát hiện loại dự án (Web tĩnh hoặc Node.js Backend), cấu hình Nginx port-based và PM2.\n\n` +
-          `<b>Cách 1 (Bấm nút trên Telegram):</b> Gõ <code>/deploy</code> để hiện danh sách file .zip có sẵn.\n` +
-          `<b>Cách 2 (Gõ lệnh trực tiếp):</b> <code>/deploy &lt;tên_file.zip&gt; [port]</code>\n\n` +
-          `<b>Ví dụ:</b> <code>/deploy my-portfolio.zip</code>`
+          `Hỗ trợ deploy tự động lên VPS (Nginx), Vercel hoặc Render kèm cấp subdomain tự động.\n\n` +
+          `<b>Cách 1 (Bấm nút trên Telegram):</b> Gõ <code>/deploy</code> để chọn file .zip sẵn có.\n` +
+          `<b>Cách 2 (Dán link GitHub):</b> Dán trực tiếp link GitHub công khai vào khung chat để chọn deploy Vercel/Render.\n` +
+          `<b>Cách 3 (Gõ lệnh trực tiếp):</b> <code>/deploy &lt;file.zip&gt; [vps|vercel]</code>\n\n` +
+          `<b>Ví dụ:</b> <code>/deploy my-portfolio.zip vps</code>`
         );
         return;
       }
 
-      // Nếu truyền thẳng tên file qua tham số: /deploy app.zip 8085
       if (args.length > 0) {
         const zipArg = args[0].endsWith('.zip') ? args[0] : `${args[0]}.zip`;
-        const portArg = args[1] ? Number(args[1]) : null;
-        await handleDeployExecution(ctx, zipArg, config, portArg);
+        const targetArg = (args[1] || 'vps').toLowerCase();
+        await handleZipDeploy(ctx, zipArg, targetArg, config);
         return;
       }
 
-      // Không truyền tham số: quét thư mục upload và tạo inline buttons
       const zips = await sandbox.listUploadZipFiles(config.uploadDir);
 
       if (!zips.length) {
         await ctx.replyWithHTML(
           `📦 <b>Không tìm thấy file .zip nào trong thư mục upload!</b>\n\n` +
           `• Thư mục upload: <code>${escapeHtml(config.uploadDir)}</code>\n\n` +
-          `<b>Hướng dẫn upload từ máy tính:</b>\n` +
-          `<code>gcloud compute scp my-app.zip &lt;tên_vps&gt;:${escapeHtml(config.uploadDir)}/</code>\n` +
-          `<i>hoặc dùng lệnh scp / sftp tương tự.</i>`
+          `<i>Bạn có thể upload file .zip qua scp/sftp hoặc gửi trực tiếp link GitHub công khai để deploy ngay!</i>`
         );
         return;
       }
@@ -104,7 +148,7 @@ module.exports = {
 
       await ctx.replyWithHTML(
         `🚀 <b>DANH SÁCH FILE ZIP SẴN SÀNG DEPLOY</b>\n` +
-        `<i>Bấm vào file bạn muốn triển khai lên server:</i>`,
+        `<i>Bấm vào file bạn muốn triển khai:</i>`,
         {
           reply_markup: {
             inline_keyboard: buttons,
@@ -118,15 +162,65 @@ module.exports = {
   },
 
   register: (bot, config) => {
-    // Lắng nghe sự kiện bấm nút Inline Button
+    // 1. Khi chọn file ZIP: hỏi nền tảng nếu có nhiều hơn 1 lựa chọn
     bot.action(/^deploy_zip:(.+)$/, async (ctx) => {
       try {
-        await ctx.answerCbQuery('Bắt đầu deploy...');
+        await ctx.answerCbQuery();
         const zipName = ctx.match[1];
-        await handleDeployExecution(ctx, zipName, config);
+        const validTargets = deployer.getValidTargetsForSource('zip_upload', config);
+
+        if (validTargets.length > 1) {
+          const buttons = [];
+          if (validTargets.includes('vps')) {
+            buttons.push([{ text: '🖥️ Triển khai lên VPS (Nginx)', callback_data: `zip_target:vps:${zipName}` }]);
+          }
+          if (validTargets.includes('vercel')) {
+            buttons.push([{ text: '▲ Triển khai lên Vercel', callback_data: `zip_target:vercel:${zipName}` }]);
+          }
+
+          await ctx.replyWithHTML(
+            `📦 <b>Đã chọn file:</b> <code>${escapeHtml(zipName)}</code>\n\n` +
+            `<b>Chọn nền tảng triển khai:</b>`,
+            {
+              reply_markup: {
+                inline_keyboard: buttons,
+              },
+            }
+          );
+          return;
+        }
+
+        // Nếu chỉ có VPS
+        await handleZipDeploy(ctx, zipName, 'vps', config);
       } catch (err) {
-        console.error('[DEPLOY_ACTION_ERROR]', err);
-        await ctx.reply('⚠️ Lỗi khi xử lý thao tác deploy.');
+        console.error('[DEPLOY_ZIP_ACTION_ERROR]', err);
+        await ctx.reply('⚠️ Lỗi khi chọn file deploy.');
+      }
+    });
+
+    // 2. Khi xác nhận nền tảng cho file ZIP
+    bot.action(/^zip_target:([a-zA-Z0-9_-]+):(.+)$/, async (ctx) => {
+      try {
+        await ctx.answerCbQuery('Bắt đầu triển khai...');
+        const target = ctx.match[1];
+        const zipName = ctx.match[2];
+        await handleZipDeploy(ctx, zipName, target, config);
+      } catch (err) {
+        console.error('[ZIP_TARGET_ACTION_ERROR]', err);
+        await ctx.reply('⚠️ Lỗi khi kích hoạt deploy file zip.');
+      }
+    });
+
+    // 3. Khi xác nhận nền tảng cho GitHub Link
+    bot.action(/^git_target:([a-zA-Z0-9]+):([a-zA-Z0-9_-]+)$/, async (ctx) => {
+      try {
+        await ctx.answerCbQuery('Bắt đầu triển khai GitHub...');
+        const deployId = ctx.match[1];
+        const target = ctx.match[2];
+        await handleGitDeploy(ctx, deployId, target, config);
+      } catch (err) {
+        console.error('[GIT_TARGET_ACTION_ERROR]', err);
+        await ctx.reply('⚠️ Lỗi khi kích hoạt deploy từ GitHub.');
       }
     });
   },
