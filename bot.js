@@ -90,14 +90,22 @@ async function startBot() {
       console.error("[BOT_RUNTIME_ERROR]", error);
     });
 
-    await bot.launch({ dropPendingUpdates: true });
-    console.log("✅ Dev Assistant Bot đang chạy mượt mà...");
+    // Kích hoạt Web Dashboard API Server (chạy trước bot.launch để đảm bảo luôn mở cổng 3001)
+    startDashboardServer(config);
 
     // Kích hoạt service giám sát tự động (watchdog)
     startWatchdog(bot, config);
 
-    // Kích hoạt Web Dashboard API Server
-    startDashboardServer(config);
+    // Khởi động bot Telegram bất đồng bộ (tránh block event loop vì bot.launch giữ promise)
+    bot.launch({ dropPendingUpdates: true })
+      .then(() => {
+        console.log("🛑 Bot Telegram đã kết thúc nhận cập nhật.");
+      })
+      .catch((err) => {
+        console.error("[BOT_LAUNCH_ERROR]", err);
+      });
+
+    console.log("✅ Dev Assistant Bot và Dashboard API đang chạy mượt mà...");
   } catch (error) {
     console.error("[BOT_STARTUP_ERROR]", error);
     process.exitCode = 1;
