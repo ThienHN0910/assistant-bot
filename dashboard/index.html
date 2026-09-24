@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevOps Dashboard | Assistant Bot</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+    [v-cloak] { display: none; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
+  <div id="app" v-cloak class="p-4 md:p-8 max-w-7xl mx-auto">
+    <!-- 1. AUTH SCREEN (If not authenticated) -->
+    <div v-if="!isAuthenticated" class="min-h-[80vh] flex items-center justify-center">
+      <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full text-center">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-500/10 text-brand-500 mb-4 text-3xl">
+          🔒
+        </div>
+        <h1 class="text-2xl font-bold mb-2">DevOps Dashboard</h1>
+        <p class="text-slate-400 text-sm mb-6">Vui lòng nhập mã bảo mật (PIN / Secret Key) để truy cập hệ thống.</p>
+        
+        <form @submit.prevent="verifyAuth" class="space-y-4">
+          <input 
+            type="password" 
+            v-model="secretInput" 
+            placeholder="Nhập mã truy cập..." 
+            class="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-center tracking-widest text-lg focus:outline-none focus:border-brand-500 transition-colors"
+            autofocus
+          />
+          <p v-if="authError" class="text-rose-500 text-sm">{{ authError }}</p>
+          <button 
+            type="submit" 
+            :disabled="loadingAuth" 
+            class="w-full py-3 bg-brand-600 hover:bg-brand-500 font-semibold rounded-xl transition-colors disabled:opacity-50">
+            {{ loadingAuth ? 'Đang xác thực...' : 'Mở Khóa Dashboard' }}
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2. MAIN DASHBOARD -->
+    <div v-else class="space-y-8">
+      <!-- HEADER -->
+      <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800 pb-6">
+        <div>
+          <div class="flex items-center gap-3">
+            <span class="text-3xl">🚀</span>
+            <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
+              Dev Assistant Dashboard
+            </h1>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Live
+            </span>
+          </div>
+          <p class="text-slate-400 text-sm mt-1">Giám sát và quản lý các dịch vụ trên VPS, Vercel và Render</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button 
+            @click="fetchData" 
+            :disabled="refreshing" 
+            class="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+            <span :class="{'animate-spin': refreshing}">🔄</span>
+            Làm mới
+          </button>
+          <button 
+            @click="logout" 
+            class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-sm font-medium transition-all">
+            Đăng xuất
+          </button>
+        </div>
+      </header>
+
+      <!-- SYSTEM TELEMETRY -->
+      <section v-if="system" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- CPU -->
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Tải CPU</div>
+          <div class="text-3xl font-extrabold">{{ system.cpuLoad }}%</div>
+          <div class="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+            <div 
+              class="h-full rounded-full transition-all duration-500" 
+              :class="system.cpuLoad >= 80 ? 'bg-rose-500' : (system.cpuLoad >= 50 ? 'bg-amber-500' : 'bg-brand-500')"
+              :style="{ width: `${system.cpuLoad}%` }">
+            </div>
+          </div>
+        </div>
+
+        <!-- RAM -->
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Bộ Nhớ RAM</div>
+          <div class="text-3xl font-extrabold">{{ system.memory.usedPercentage }}%</div>
+          <div class="text-xs text-slate-400 mt-1">{{ system.memory.formatted }}</div>
+          <div class="w-full bg-slate-800 h-2 rounded-full mt-2 overflow-hidden">
+            <div 
+              class="h-full rounded-full transition-all duration-500" 
+              :class="system.memory.usedPercentage >= 80 ? 'bg-rose-500' : 'bg-emerald-500')"
+              :style="{ width: `${system.memory.usedPercentage}%` }">
+            </div>
+          </div>
+        </div>
+
+        <!-- DISK -->
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Dung Lượng Ổ Đĩa (/)</div>
+          <div class="text-3xl font-extrabold">{{ system.disk.usedPercentage }}%</div>
+          <div class="text-xs text-slate-400 mt-1">{{ system.disk.formatted }}</div>
+          <div class="w-full bg-slate-800 h-2 rounded-full mt-2 overflow-hidden">
+            <div 
+              class="h-full rounded-full transition-all duration-500" 
+              :class="system.disk.usedPercentage >= 85 ? 'bg-rose-500' : 'bg-sky-500')"
+              :style="{ width: `${system.disk.usedPercentage}%` }">
+            </div>
+          </div>
+        </div>
+
+        <!-- UPTIME -->
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Thời Gian Hoạt Động</div>
+          <div class="text-3xl font-extrabold">{{ system.uptimeFormatted }}</div>
+          <div class="text-xs text-slate-400 mt-1">Uptime máy chủ liên tục</div>
+        </div>
+      </section>
+
+      <!-- DEPLOYMENTS SECTION -->
+      <section class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold">Danh Sách Dịch Vụ Triển Khai ({{ filteredDeployments.length }})</h2>
+            <p class="text-slate-400 text-sm">Các ứng dụng đang chạy và được định tuyến tự động qua Cloudflare</p>
+          </div>
+
+          <!-- FILTERS & SEARCH -->
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="flex bg-slate-900 border border-slate-800 p-1 rounded-xl">
+              <button 
+                v-for="t in ['all', 'vps', 'vercel', 'render']" 
+                :key="t"
+                @click="targetFilter = t"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors"
+                :class="targetFilter === t ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200'">
+                {{ t === 'all' ? 'Tất cả' : t.toUpperCase() }}
+              </button>
+            </div>
+
+            <input 
+              type="text" 
+              v-model="searchQuery" 
+              placeholder="Tìm kiếm dự án..." 
+              class="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-brand-500"
+            />
+          </div>
+        </div>
+
+        <!-- EMPTY STATE -->
+        <div v-if="filteredDeployments.length === 0" class="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center">
+          <div class="text-4xl mb-3">📦</div>
+          <h3 class="text-lg font-bold mb-1">Chưa có ứng dụng nào phù hợp</h3>
+          <p class="text-slate-400 text-sm">Hãy tải lên file .zip hoặc dán link GitHub qua bot Telegram để triển khai ngay.</p>
+        </div>
+
+        <!-- CARDS GRID -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div 
+            v-for="app in filteredDeployments" 
+            :key="app.name" 
+            class="bg-slate-900 border border-slate-800 hover:border-slate-700 p-5 rounded-2xl transition-all shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex items-start justify-between gap-2 mb-3">
+                <span 
+                  class="px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider"
+                  :class="{
+                    'bg-blue-500/10 text-blue-400 border border-blue-500/20': app.target === 'vps',
+                    'bg-slate-100 text-slate-900 font-bold': app.target === 'vercel',
+                    'bg-purple-500/10 text-purple-400 border border-purple-500/20': app.target === 'render'
+                  }">
+                  {{ app.target }}
+                </span>
+                <span class="inline-flex items-center gap-1 text-xs text-emerald-400">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Online
+                </span>
+              </div>
+
+              <h3 class="text-lg font-bold truncate" :title="app.name">{{ app.name }}</h3>
+
+              <div class="mt-3 space-y-1.5 text-xs text-slate-300">
+                <div class="flex items-center gap-1">
+                  <span class="text-slate-400">Tên miền:</span>
+                  <a :href="app.url" target="_blank" class="text-brand-400 hover:underline truncate font-mono">
+                    {{ app.domain || app.url }}
+                  </a>
+                </div>
+                <div v-if="app.port" class="flex items-center gap-1">
+                  <span class="text-slate-400">Port VPS:</span>
+                  <span class="font-mono text-slate-200">{{ app.port }}</span>
+                </div>
+                <div v-if="app.sizeFormatted" class="flex items-center gap-1">
+                  <span class="text-slate-400">Dung lượng:</span>
+                  <span class="text-slate-200">{{ app.sizeFormatted }}</span>
+                </div>
+                <div class="flex items-center gap-1 text-slate-400">
+                  <span>Ngày tạo:</span>
+                  <span>{{ formatDate(app.deployedAt) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 mt-5 pt-4 border-t border-slate-800/80">
+              <a 
+                :href="app.url" 
+                target="_blank" 
+                class="flex-1 py-2 text-center bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-medium transition-colors">
+                Mở Trang Web ↗
+              </a>
+              <button 
+                @click="confirmUndeploy(app.name)" 
+                class="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-medium transition-colors"
+                title="Gỡ bỏ dự án">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div 
+      v-if="toast" 
+      class="fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium transition-all"
+      :class="toast.type === 'error' ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'">
+      {{ toast.message }}
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        const token = ref(localStorage.getItem('dashboard_token') || '');
+        const isAuthenticated = ref(Boolean(token.value));
+        const secretInput = ref('');
+        const authError = ref('');
+        const loadingAuth = ref(false);
+
+        const system = ref(null);
+        const deployments = ref([]);
+        const refreshing = ref(false);
+        const targetFilter = ref('all');
+        const searchQuery = ref('');
+        const toast = ref(null);
+
+        function showToast(message, type = 'success') {
+          toast.value = { message, type };
+          setTimeout(() => { toast.value = null; }, 4000);
+        }
+
+        async function apiRequest(path, options = {}) {
+          const headers = {
+            'Content-Type': 'application/json',
+            ...(token.value ? { Authorization: `Bearer ${token.value}` } : {}),
+            ...(options.headers || {})
+          };
+
+          const res = await fetch(path, { ...options, headers });
+          if (res.status === 401) {
+            isAuthenticated.value = false;
+            localStorage.removeItem('dashboard_token');
+            throw new Error('Hết phiên làm việc hoặc chưa xác thực');
+          }
+          return res.json();
+        }
+
+        async function verifyAuth() {
+          if (!secretInput.value) return;
+          loadingAuth.value = true;
+          authError.value = '';
+          try {
+            const res = await fetch('/api/auth/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ key: secretInput.value.trim() })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              token.value = secretInput.value.trim();
+              localStorage.setItem('dashboard_token', token.value);
+              isAuthenticated.value = true;
+              fetchData();
+            } else {
+              authError.value = data.error || 'Mã xác thực không đúng!';
+            }
+          } catch (err) {
+            authError.value = 'Lỗi kết nối tới máy chủ API';
+          } finally {
+            loadingAuth.value = false;
+          }
+        }
+
+        function logout() {
+          token.value = '';
+          localStorage.removeItem('dashboard_token');
+          isAuthenticated.value = false;
+        }
+
+        async function fetchData() {
+          if (!isAuthenticated.value) return;
+          refreshing.value = true;
+          try {
+            const [statusRes, depRes] = await Promise.all([
+              apiRequest('/api/status').catch(() => null),
+              apiRequest('/api/deployments').catch(() => null)
+            ]);
+
+            if (statusRes?.ok) system.value = statusRes.system;
+            if (depRes?.ok) deployments.value = depRes.deployments;
+          } catch (err) {
+            console.error('Lỗi nạp dữ liệu dashboard:', err);
+          } finally {
+            refreshing.value = false;
+          }
+        }
+
+        async function confirmUndeploy(name) {
+          if (!confirm(`Bạn có chắc chắn muốn xóa dự án "${name}" không? Thao tác này sẽ giải phóng tên miền và tài nguyên.`)) {
+            return;
+          }
+
+          try {
+            const res = await apiRequest('/api/deployments/undeploy', {
+              method: 'POST',
+              body: JSON.stringify({ name })
+            });
+
+            if (res.ok) {
+              showToast(`Đã gỡ bỏ thành công dự án "${name}"`);
+              fetchData();
+            } else {
+              showToast(res.error || 'Lỗi khi gỡ bỏ dự án', 'error');
+            }
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        const filteredDeployments = computed(() => {
+          return deployments.value.filter((d) => {
+            const matchTarget = targetFilter.value === 'all' || d.target === targetFilter.value;
+            const matchSearch = !searchQuery.value || 
+              d.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+              (d.domain && d.domain.toLowerCase().includes(searchQuery.value.toLowerCase()));
+            return matchTarget && matchSearch;
+          });
+        });
+
+        function formatDate(isoStr) {
+          if (!isoStr) return 'N/A';
+          try {
+            return new Date(isoStr).toLocaleString('vi-VN');
+          } catch {
+            return isoStr;
+          }
+        }
+
+        onMounted(() => {
+          if (isAuthenticated.value) {
+            fetchData();
+            setInterval(fetchData, 15000); // Polling 15s
+          }
+        });
+
+        return {
+          token,
+          isAuthenticated,
+          secretInput,
+          authError,
+          loadingAuth,
+          system,
+          deployments,
+          refreshing,
+          targetFilter,
+          searchQuery,
+          toast,
+          filteredDeployments,
+          verifyAuth,
+          logout,
+          fetchData,
+          confirmUndeploy,
+          formatDate
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

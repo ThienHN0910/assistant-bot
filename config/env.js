@@ -47,6 +47,9 @@ function getConfig() {
   const renderApiKey = (process.env.RENDER_API_KEY || '').trim();
   const renderOwnerId = (process.env.RENDER_OWNER_ID || '').trim();
   const deployRegistryPath = toAbsolutePath(process.env.DEPLOY_REGISTRY_PATH || './data/deployments.json');
+  // Cấu hình Web Dashboard (Tùy chọn)
+  const dashboardSecretKey = (process.env.DASHBOARD_SECRET_KEY || '').trim();
+  const dashboardPort = Number(process.env.DASHBOARD_PORT) || 3001;
 
   return {
     botToken,
@@ -64,6 +67,8 @@ function getConfig() {
     renderApiKey,
     renderOwnerId,
     deployRegistryPath,
+    dashboardSecretKey,
+    dashboardPort,
   };
 }
 
