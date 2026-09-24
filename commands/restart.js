@@ -25,7 +25,7 @@ module.exports = {
       );
 
       setTimeout(() => {
-        exec(`pm2 restart ${processName}`, (error, stdout, stderr) => {
+        exec(`pm2 restart ${processName} --update-env`, (error, stdout, stderr) => {
           if (error) {
             console.error('[RESTART_EXEC_ERROR]', error, stderr);
           } else {
