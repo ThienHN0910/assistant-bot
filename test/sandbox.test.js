@@ -72,6 +72,10 @@ async function testSandbox() {
     assert(staticConf.includes('server_name app1.thienhn.io.vn;'), 'Static conf should include server_name');
     assert(staticConf.includes('root /home/hnt/web/app1/dist;'), 'Static conf should include root path');
     assert(staticConf.includes('listen 80;'), 'Static conf should listen on 80');
+    assert(staticConf.includes('return 301 https://$host$request_uri;'), 'Static conf should redirect 80 to 443');
+    assert(staticConf.includes('listen 443 ssl;'), 'Static conf should listen on 443 ssl');
+    assert(staticConf.includes('/etc/ssl/certs/cloudflare_cert.pem;'), 'Static conf should reference cloudflare cert');
+    assert(staticConf.includes('/etc/ssl/private/cloudflare_key.key;'), 'Static conf should reference cloudflare key');
 
     const backendConf = sandbox.generateNginxConfig({
       name: 'api1',
@@ -81,18 +85,44 @@ async function testSandbox() {
     });
     assert(backendConf.includes('server_name api1.thienhn.io.vn;'), 'Backend conf should include server_name');
     assert(backendConf.includes('proxy_pass http://127.0.0.1:8082;'), 'Backend conf should proxy to local port');
-    console.log('✅ sandbox generateNginxConfig static and backend test passed');
+    assert(backendConf.includes('listen 443 ssl;'), 'Backend conf should listen on 443 ssl');
+    console.log('✅ sandbox generateNginxConfig Cloudflare SSL test passed');
 
     // 5. Test detectProjectType
     const staticType = await sandbox.detectProjectType(project1Dir);
     assert.strictEqual(staticType, 'static', 'Should detect static');
 
+    // 5a. Backend app with server.js
     const backendDir = path.join(testRoot, 'backend_app');
     await fs.mkdir(backendDir, { recursive: true });
-    await fs.writeFile(path.join(backendDir, 'package.json'), '{"name":"api"}', 'utf8');
+    await fs.writeFile(path.join(backendDir, 'package.json'), '{"name":"api","dependencies":{"express":"^4.18.2"}}', 'utf8');
+    await fs.writeFile(path.join(backendDir, 'server.js'), 'console.log("server")', 'utf8');
     const backendType = await sandbox.detectProjectType(backendDir);
     assert.strictEqual(backendType, 'backend', 'Should detect backend');
-    console.log('✅ sandbox detectProjectType test passed');
+
+    // 5b. Unbuilt frontend with Vite (must reject due to VPS 1GB RAM)
+    const unbuiltViteDir = path.join(testRoot, 'unbuilt_vite');
+    await fs.mkdir(unbuiltViteDir, { recursive: true });
+    await fs.writeFile(
+      path.join(unbuiltViteDir, 'package.json'),
+      '{"name":"fe","devDependencies":{"vite":"^5.0.0","@vitejs/plugin-react":"^4.0.0"}}',
+      'utf8'
+    );
+    let rejected = false;
+    try {
+      await sandbox.detectProjectType(unbuiltViteDir);
+    } catch (err) {
+      rejected = true;
+      assert(err.message.includes('1GB RAM'), 'Error message should mention 1GB RAM constraint');
+    }
+    assert.strictEqual(rejected, true, 'Unbuilt frontend should be rejected on VPS');
+
+    // 5c. Pre-built frontend with Vite (has dist/index.html) -> static
+    await fs.mkdir(path.join(unbuiltViteDir, 'dist'), { recursive: true });
+    await fs.writeFile(path.join(unbuiltViteDir, 'dist', 'index.html'), '<html></html>', 'utf8');
+    const prebuiltType = await sandbox.detectProjectType(unbuiltViteDir);
+    assert.strictEqual(prebuiltType, 'static', 'Pre-built frontend should be detected as static');
+    console.log('✅ sandbox detectProjectType RAM safety & detection test passed');
 
     // 6. Test removeProject
     await sandbox.removeProject('app1', { webDeployDir: webDir });
