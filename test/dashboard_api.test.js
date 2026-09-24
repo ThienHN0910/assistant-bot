@@ -2,7 +2,11 @@ const assert = require('assert');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs/promises');
-const { createDashboardServer } = require('../services/dashboardApi');
+const {
+  createDashboardServer,
+  createSessionToken,
+  verifySessionToken,
+} = require('../services/dashboardApi');
 
 async function testDashboardApi() {
   const testRoot = path.join(__dirname, 'test_dashboard_env');
@@ -18,63 +22,136 @@ async function testDashboardApi() {
   );
 
   const testPort = 3899;
+  const sessionSecret = 'test-session-secret-12345';
+  const authorizedEmail = 'admin@thienhn.io.vn';
+  const googleClientId = 'test-google-client-id.apps.googleusercontent.com';
+
   const config = {
     dashboardPort: testPort,
-    dashboardSecretKey: 'super-secret-pin',
+    googleClientId,
+    authorizedGoogleEmail: authorizedEmail,
+    sessionSecret,
     deployRegistryPath: registryPath,
     baseDomain: 'thienhn.io.vn',
   };
 
-  const server = createDashboardServer(config);
+  // Mock Axios for Google TokenInfo
+  const mockHttpClient = {
+    get: async (url) => {
+      if (url.includes('token=valid-admin-token')) {
+        return {
+          data: {
+            email: authorizedEmail,
+            email_verified: true,
+            aud: googleClientId,
+            name: 'Thien Admin',
+            picture: 'https://example.com/avatar.png',
+          },
+        };
+      }
+      if (url.includes('token=unauthorized-user-token')) {
+        return {
+          data: {
+            email: 'stranger@gmail.com',
+            email_verified: true,
+            aud: googleClientId,
+            name: 'Stranger',
+          },
+        };
+      }
+      const err = new Error('Invalid token');
+      err.response = { data: { error_description: 'Token invalid' } };
+      throw err;
+    },
+  };
+
+  const server = createDashboardServer(config, { axios: mockHttpClient });
   await new Promise((resolve) => server.listen(testPort, '127.0.0.1', resolve));
 
   const client = axios.create({
     baseURL: `http://127.0.0.1:${testPort}`,
-    validateStatus: () => true, // Don't throw on 4xx/5xx
+    validateStatus: () => true,
   });
 
   try {
-    // 1. Health check (unauthenticated)
+    // 1. Session Token Unit Tests
+    const validToken = createSessionToken(authorizedEmail, sessionSecret);
+    const verified = verifySessionToken(validToken, sessionSecret, authorizedEmail);
+    assert(verified, 'Session token should verify successfully');
+    assert.strictEqual(verified.email, authorizedEmail);
+
+    const wrongEmail = verifySessionToken(validToken, sessionSecret, 'other@email.com');
+    assert.strictEqual(wrongEmail, null, 'Should reject token with mismatched email');
+
+    const wrongSecret = verifySessionToken(validToken, 'wrong-secret', authorizedEmail);
+    assert.strictEqual(wrongSecret, null, 'Should reject token signed with different secret');
+    console.log('✅ session token creation and verification unit test passed');
+
+    // 2. Health check (unauthenticated)
     const healthRes = await client.get('/api/health');
     assert.strictEqual(healthRes.status, 200);
     assert.strictEqual(healthRes.data.ok, true);
     console.log('✅ dashboardApi /api/health test passed');
 
-    // 2. Auth verify - wrong pin
-    const failAuthRes = await client.post('/api/auth/verify', { key: 'wrong-key' });
-    assert.strictEqual(failAuthRes.status, 401);
-    assert.strictEqual(failAuthRes.data.ok, false);
-    console.log('✅ dashboardApi /api/auth/verify rejection test passed');
+    // 3. Auth config endpoint
+    const configRes = await client.get('/api/auth/config');
+    assert.strictEqual(configRes.status, 200);
+    assert.strictEqual(configRes.data.googleClientId, googleClientId);
+    console.log('✅ dashboardApi /api/auth/config test passed');
 
-    // 3. Auth verify - correct pin
-    const passAuthRes = await client.post('/api/auth/verify', { key: 'super-secret-pin' });
-    assert.strictEqual(passAuthRes.status, 200);
-    assert.strictEqual(passAuthRes.data.authenticated, true);
+    // 4. Google Auth - Invalid token
+    const invalidGoogleRes = await client.post('/api/auth/google', { credential: 'bad-token' });
+    assert.strictEqual(invalidGoogleRes.status, 401);
+    console.log('✅ dashboardApi /api/auth/google bad token rejection test passed');
+
+    // 5. Google Auth - Unauthorized email (403 Forbidden)
+    const strangerRes = await client.post('/api/auth/google', { credential: 'unauthorized-user-token' });
+    assert.strictEqual(strangerRes.status, 403);
+    assert(strangerRes.data.error.includes('không có quyền truy cập'));
+    console.log('✅ dashboardApi /api/auth/google unauthorized email 403 test passed');
+
+    // 6. Google Auth - Authorized email (200 OK + returns session token)
+    const adminRes = await client.post('/api/auth/google', { credential: 'valid-admin-token' });
+    assert.strictEqual(adminRes.status, 200);
+    assert.strictEqual(adminRes.data.ok, true);
+    assert(adminRes.data.token, 'Should return session token');
+    assert.strictEqual(adminRes.data.user.email, authorizedEmail);
+    const sessionToken = adminRes.data.token;
+    console.log('✅ dashboardApi /api/auth/google authorized login success test passed');
+
+    // 7. Verify session token endpoint
+    const verifyPassRes = await client.post(
+      '/api/auth/verify',
+      {},
+      { headers: { Authorization: `Bearer ${sessionToken}` } }
+    );
+    assert.strictEqual(verifyPassRes.status, 200);
+    assert.strictEqual(verifyPassRes.data.authenticated, true);
     console.log('✅ dashboardApi /api/auth/verify success test passed');
 
-    // 4. Access protected endpoint without auth
+    // 8. Access protected endpoint without auth
     const unauthRes = await client.get('/api/deployments');
     assert.strictEqual(unauthRes.status, 401);
     console.log('✅ dashboardApi protected endpoint unauthorized test passed');
 
-    // 5. Access protected endpoint with Bearer token
-    const authHeaders = { Authorization: 'Bearer super-secret-pin' };
+    // 9. Access protected endpoint with Bearer session token
+    const authHeaders = { Authorization: `Bearer ${sessionToken}` };
     const depRes = await client.get('/api/deployments', { headers: authHeaders });
     assert.strictEqual(depRes.status, 200);
     assert.strictEqual(depRes.data.ok, true);
     assert(Array.isArray(depRes.data.deployments));
     assert.strictEqual(depRes.data.deployments[0].name, 'app-test');
-    console.log('✅ dashboardApi /api/deployments with Bearer token test passed');
+    console.log('✅ dashboardApi /api/deployments with Bearer session token test passed');
 
-    // 6. Access /api/status telemetry with query param ?key=
-    const statusRes = await client.get('/api/status?key=super-secret-pin');
+    // 10. Access /api/status telemetry with session token
+    const statusRes = await client.get('/api/status', { headers: authHeaders });
     assert.strictEqual(statusRes.status, 200);
     assert.strictEqual(statusRes.data.ok, true);
     assert(typeof statusRes.data.system.cpuLoad === 'number');
     assert(statusRes.data.system.memory);
     console.log('✅ dashboardApi /api/status telemetry test passed');
 
-    // 7. Undeploy endpoint
+    // 11. Undeploy endpoint
     const undeployRes = await client.post('/api/deployments/undeploy', { name: 'app-test' }, { headers: authHeaders });
     assert.strictEqual(undeployRes.status, 200);
     assert.strictEqual(undeployRes.data.ok, true);

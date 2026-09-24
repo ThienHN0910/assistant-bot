@@ -25,37 +25,56 @@
   </script>
   <!-- Vue 3 CDN -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Google Identity Services (GIS) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     [v-cloak] { display: none; }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
   <div id="app" v-cloak class="p-4 md:p-8 max-w-7xl mx-auto">
-    <!-- 1. AUTH SCREEN (If not authenticated) -->
-    <div v-if="!isAuthenticated" class="min-h-[80vh] flex items-center justify-center">
-      <div class="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl max-w-md w-full text-center">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-500/10 text-brand-500 mb-4 text-3xl">
-          🔒
+    <!-- 1. AUTH SCREEN (Google OAuth 2.0) -->
+    <div v-if="!isAuthenticated" class="min-h-[85vh] flex items-center justify-center">
+      <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center">
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-tr from-brand-600/20 to-brand-500/10 text-brand-400 mb-6 border border-brand-500/20 shadow-inner">
+          <svg class="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
         </div>
-        <h1 class="text-2xl font-bold mb-2">DevOps Dashboard</h1>
-        <p class="text-slate-400 text-sm mb-6">Vui lòng nhập mã bảo mật (PIN / Secret Key) để truy cập hệ thống.</p>
-        
-        <form @submit.prevent="verifyAuth" class="space-y-4">
-          <input 
-            type="password" 
-            v-model="secretInput" 
-            placeholder="Nhập mã truy cập..." 
-            class="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-center tracking-widest text-lg focus:outline-none focus:border-brand-500 transition-colors"
-            autofocus
-          />
-          <p v-if="authError" class="text-rose-500 text-sm">{{ authError }}</p>
-          <button 
-            type="submit" 
-            :disabled="loadingAuth" 
-            class="w-full py-3 bg-brand-600 hover:bg-brand-500 font-semibold rounded-xl transition-colors disabled:opacity-50">
-            {{ loadingAuth ? 'Đang xác thực...' : 'Mở Khóa Dashboard' }}
-          </button>
-        </form>
+
+        <h1 class="text-2xl md:text-3xl font-extrabold mb-2 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+          DevOps Dashboard
+        </h1>
+        <p class="text-slate-400 text-sm mb-6 leading-relaxed">
+          Hệ thống bảo mật cao với Google OAuth 2.0. Chỉ tài khoản Google được ủy quyền mới có thể truy cập.
+        </p>
+
+        <!-- Loading State -->
+        <div v-if="loadingAuth" class="py-6 flex flex-col items-center justify-center gap-3">
+          <div class="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+          <span class="text-sm text-slate-400 font-medium">Đang xác thực tài khoản Google...</span>
+        </div>
+
+        <!-- Google Sign-In Button Container -->
+        <div v-show="!loadingAuth" class="flex flex-col items-center justify-center py-2">
+          <div id="google-btn-container" class="min-h-[44px] flex justify-center"></div>
+
+          <div v-if="!googleClientId" class="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs text-left">
+            ⚠️ <b>Chưa cấu hình GOOGLE_CLIENT_ID:</b><br/>
+            Vui lòng mở file <code>.env</code> trên máy chủ và cập nhật <code>GOOGLE_CLIENT_ID</code> theo hướng dẫn trong <code>.env.example</code>.
+          </div>
+        </div>
+
+        <!-- Error Alert -->
+        <div v-if="authError" class="mt-5 p-3.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+          <span>⚠️</span>
+          <span>{{ authError }}</span>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-slate-800 text-xs text-slate-500">
+          Assistant Bot • Multi-Cloud DevOps Orchestrator
+        </div>
       </div>
     </div>
 
@@ -73,10 +92,19 @@
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Live
             </span>
           </div>
-          <p class="text-slate-400 text-sm mt-1">Giám sát và quản lý các dịch vụ trên VPS, Vercel và Render</p>
+          <p class="text-slate-400 text-sm mt-1">Giám sát và quản lý hạ tầng VPS, Vercel và Render</p>
         </div>
 
         <div class="flex items-center gap-3">
+          <!-- Logged in Google User Info -->
+          <div v-if="user" class="flex items-center gap-2.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl">
+            <img v-if="user.picture" :src="user.picture" alt="Avatar" class="w-7 h-7 rounded-full border border-slate-700" />
+            <div class="text-left hidden sm:block">
+              <div class="text-xs font-semibold text-slate-200">{{ user.name }}</div>
+              <div class="text-[10px] text-slate-400 font-mono">{{ user.email }}</div>
+            </div>
+          </div>
+
           <button 
             @click="fetchData" 
             :disabled="refreshing" 
@@ -115,7 +143,7 @@
           <div class="w-full bg-slate-800 h-2 rounded-full mt-2 overflow-hidden">
             <div 
               class="h-full rounded-full transition-all duration-500" 
-              :class="system.memory.usedPercentage >= 80 ? 'bg-rose-500' : 'bg-emerald-500')"
+              :class="system.memory.usedPercentage >= 80 ? 'bg-rose-500' : 'bg-emerald-500'"
               :style="{ width: `${system.memory.usedPercentage}%` }">
             </div>
           </div>
@@ -123,13 +151,13 @@
 
         <!-- DISK -->
         <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Dung Lượng Ổ Đĩa (/)</div>
+          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Ổ Đĩa Gốc (/)</div>
           <div class="text-3xl font-extrabold">{{ system.disk.usedPercentage }}%</div>
           <div class="text-xs text-slate-400 mt-1">{{ system.disk.formatted }}</div>
           <div class="w-full bg-slate-800 h-2 rounded-full mt-2 overflow-hidden">
             <div 
               class="h-full rounded-full transition-all duration-500" 
-              :class="system.disk.usedPercentage >= 85 ? 'bg-rose-500' : 'bg-sky-500')"
+              :class="system.disk.usedPercentage >= 90 ? 'bg-rose-500' : 'bg-brand-500'"
               :style="{ width: `${system.disk.usedPercentage}%` }">
             </div>
           </div>
@@ -137,144 +165,154 @@
 
         <!-- UPTIME -->
         <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Thời Gian Hoạt Động</div>
-          <div class="text-3xl font-extrabold">{{ system.uptimeFormatted }}</div>
-          <div class="text-xs text-slate-400 mt-1">Uptime máy chủ liên tục</div>
+          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Thời Gian Chạy</div>
+          <div class="text-2xl font-bold mt-1 text-slate-200">{{ system.uptimeFormatted }}</div>
+          <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Hệ thống ổn định
+          </div>
         </div>
       </section>
 
-      <!-- DEPLOYMENTS SECTION -->
-      <section class="space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <!-- DEPLOYMENTS CONTROLS & TABLE -->
+      <section class="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+        <div class="p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 class="text-xl font-bold">Danh Sách Dịch Vụ Triển Khai ({{ filteredDeployments.length }})</h2>
-            <p class="text-slate-400 text-sm">Các ứng dụng đang chạy và được định tuyến tự động qua Cloudflare</p>
+            <h2 class="text-xl font-bold">Danh Sách Dịch Vụ Đã Triển Khai</h2>
+            <p class="text-slate-400 text-xs mt-1">Tổng cộng: {{ filteredDeployments.length }} ứng dụng đang hoạt động</p>
           </div>
 
-          <!-- FILTERS & SEARCH -->
-          <div class="flex flex-wrap items-center gap-2">
-            <div class="flex bg-slate-900 border border-slate-800 p-1 rounded-xl">
-              <button 
-                v-for="t in ['all', 'vps', 'vercel', 'render']" 
-                :key="t"
-                @click="targetFilter = t"
-                class="px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors"
-                :class="targetFilter === t ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200'">
-                {{ t === 'all' ? 'Tất cả' : t.toUpperCase() }}
-              </button>
-            </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <!-- Filter by target -->
+            <select 
+              v-model="targetFilter" 
+              class="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-brand-500">
+              <option value="all">Tất cả nền tảng</option>
+              <option value="vps">💻 VPS (Nginx)</option>
+              <option value="vercel">▲ Vercel</option>
+              <option value="render">🔷 Render</option>
+            </select>
 
+            <!-- Search box -->
             <input 
               type="text" 
               v-model="searchQuery" 
-              placeholder="Tìm kiếm dự án..." 
-              class="px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:outline-none focus:border-brand-500"
+              placeholder="Tìm kiếm dự án, domain..." 
+              class="px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-brand-500 w-full sm:w-64"
             />
           </div>
         </div>
 
-        <!-- EMPTY STATE -->
-        <div v-if="filteredDeployments.length === 0" class="bg-slate-900 border border-slate-800 p-12 rounded-2xl text-center">
-          <div class="text-4xl mb-3">📦</div>
-          <h3 class="text-lg font-bold mb-1">Chưa có ứng dụng nào phù hợp</h3>
-          <p class="text-slate-400 text-sm">Hãy tải lên file .zip hoặc dán link GitHub qua bot Telegram để triển khai ngay.</p>
-        </div>
+        <!-- TABLE -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-slate-950/50 text-slate-400 uppercase text-xs tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="px-6 py-4">Tên Dự Án</th>
+                <th class="px-6 py-4">Nền Tảng</th>
+                <th class="px-6 py-4">Tên Miền / Cổng</th>
+                <th class="px-6 py-4">Trạng Thái</th>
+                <th class="px-6 py-4">Ngày Triển Khai</th>
+                <th class="px-6 py-4 text-right">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800">
+              <tr v-if="filteredDeployments.length === 0">
+                <td colspan="6" class="px-6 py-12 text-center text-slate-500">
+                  Chưa có dịch vụ nào phù hợp với bộ lọc tìm kiếm.
+                </td>
+              </tr>
+              <tr v-for="dep in filteredDeployments" :key="dep.id || dep.name" class="hover:bg-slate-800/40 transition-colors">
+                <!-- Name -->
+                <td class="px-6 py-4 font-semibold text-white flex items-center gap-2">
+                  <span class="text-lg">📁</span>
+                  <span>{{ dep.name }}</span>
+                </td>
 
-        <!-- CARDS GRID -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div 
-            v-for="app in filteredDeployments" 
-            :key="app.name" 
-            class="bg-slate-900 border border-slate-800 hover:border-slate-700 p-5 rounded-2xl transition-all shadow-sm flex flex-col justify-between">
-            <div>
-              <div class="flex items-start justify-between gap-2 mb-3">
-                <span 
-                  class="px-2.5 py-1 rounded-md text-xs font-semibold uppercase tracking-wider"
-                  :class="{
-                    'bg-blue-500/10 text-blue-400 border border-blue-500/20': app.target === 'vps',
-                    'bg-slate-100 text-slate-900 font-bold': app.target === 'vercel',
-                    'bg-purple-500/10 text-purple-400 border border-purple-500/20': app.target === 'render'
-                  }">
-                  {{ app.target }}
-                </span>
-                <span class="inline-flex items-center gap-1 text-xs text-emerald-400">
-                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Online
-                </span>
-              </div>
+                <!-- Target -->
+                <td class="px-6 py-4">
+                  <span 
+                    class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold"
+                    :class="{
+                      'bg-sky-500/10 text-sky-400 border border-sky-500/20': dep.target === 'vps',
+                      'bg-white/10 text-white border border-white/20': dep.target === 'vercel',
+                      'bg-purple-500/10 text-purple-400 border border-purple-500/20': dep.target === 'render'
+                    }">
+                    {{ dep.target === 'vps' ? '💻 VPS' : (dep.target === 'vercel' ? '▲ Vercel' : '🔷 Render') }}
+                  </span>
+                </td>
 
-              <h3 class="text-lg font-bold truncate" :title="app.name">{{ app.name }}</h3>
+                <!-- Domain & Port -->
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-1.5">
+                    <a :href="dep.url" target="_blank" class="text-brand-400 hover:text-brand-300 font-mono text-xs flex items-center gap-1">
+                      {{ dep.domain || dep.url }}
+                      <span>↗</span>
+                    </a>
+                  </div>
+                  <div v-if="dep.port" class="text-[11px] text-slate-500 mt-0.5">Port nội bộ: :{{ dep.port }}</div>
+                </td>
 
-              <div class="mt-3 space-y-1.5 text-xs text-slate-300">
-                <div class="flex items-center gap-1">
-                  <span class="text-slate-400">Tên miền:</span>
-                  <a :href="app.url" target="_blank" class="text-brand-400 hover:underline truncate font-mono">
-                    {{ app.domain || app.url }}
-                  </a>
-                </div>
-                <div v-if="app.port" class="flex items-center gap-1">
-                  <span class="text-slate-400">Port VPS:</span>
-                  <span class="font-mono text-slate-200">{{ app.port }}</span>
-                </div>
-                <div v-if="app.sizeFormatted" class="flex items-center gap-1">
-                  <span class="text-slate-400">Dung lượng:</span>
-                  <span class="text-slate-200">{{ app.sizeFormatted }}</span>
-                </div>
-                <div class="flex items-center gap-1 text-slate-400">
-                  <span>Ngày tạo:</span>
-                  <span>{{ formatDate(app.deployedAt) }}</span>
-                </div>
-              </div>
-            </div>
+                <!-- Status -->
+                <td class="px-6 py-4">
+                  <span class="inline-flex items-center gap-1 text-xs text-emerald-400">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Online
+                  </span>
+                </td>
 
-            <div class="flex items-center gap-2 mt-5 pt-4 border-t border-slate-800/80">
-              <a 
-                :href="app.url" 
-                target="_blank" 
-                class="flex-1 py-2 text-center bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-medium transition-colors">
-                Mở Trang Web ↗
-              </a>
-              <button 
-                @click="confirmUndeploy(app.name)" 
-                class="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-medium transition-colors"
-                title="Gỡ bỏ dự án">
-                🗑️
-              </button>
-            </div>
-          </div>
+                <!-- Deployed At -->
+                <td class="px-6 py-4 text-xs text-slate-400">
+                  {{ formatDate(dep.deployedAt) }}
+                </td>
+
+                <!-- Actions -->
+                <td class="px-6 py-4 text-right">
+                  <button 
+                    @click="confirmUndeploy(dep.name)"
+                    class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-medium transition-all">
+                    Gỡ bỏ
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
     </div>
 
     <!-- TOAST NOTIFICATION -->
     <div 
-      v-if="toast" 
-      class="fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium transition-all"
+      v-if="toast.show" 
+      class="fixed bottom-6 right-6 px-5 py-3 rounded-2xl shadow-2xl text-sm font-medium flex items-center gap-3 transition-all transform z-50"
       :class="toast.type === 'error' ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'">
-      {{ toast.message }}
+      <span>{{ toast.type === 'error' ? '❌' : '✅' }}</span>
+      <span>{{ toast.message }}</span>
     </div>
   </div>
 
+  <!-- VUE APPLICATION LOGIC -->
   <script>
-    const { createApp, ref, computed, onMounted } = Vue;
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
     createApp({
       setup() {
-        const token = ref(localStorage.getItem('dashboard_token') || '');
-        const isAuthenticated = ref(Boolean(token.value));
-        const secretInput = ref('');
+        const token = ref(localStorage.getItem('dashboard_session') || '');
+        const user = ref(JSON.parse(localStorage.getItem('dashboard_user') || 'null'));
+        const isAuthenticated = ref(false);
+        const googleClientId = ref('');
         const authError = ref('');
         const loadingAuth = ref(false);
-
+        
         const system = ref(null);
         const deployments = ref([]);
         const refreshing = ref(false);
         const targetFilter = ref('all');
         const searchQuery = ref('');
-        const toast = ref(null);
+
+        const toast = ref({ show: false, message: '', type: 'success' });
 
         function showToast(message, type = 'success') {
-          toast.value = { message, type };
-          setTimeout(() => { toast.value = null; }, 4000);
+          toast.value = { show: true, message, type };
+          setTimeout(() => { toast.value.show = false; }, 4000);
         }
 
         async function apiRequest(path, options = {}) {
@@ -286,43 +324,110 @@
 
           const res = await fetch(path, { ...options, headers });
           if (res.status === 401) {
-            isAuthenticated.value = false;
-            localStorage.removeItem('dashboard_token');
+            logout();
             throw new Error('Hết phiên làm việc hoặc chưa xác thực');
           }
           return res.json();
         }
 
-        async function verifyAuth() {
-          if (!secretInput.value) return;
+        async function initGoogleAuth() {
+          try {
+            const res = await fetch('/api/auth/config');
+            const data = await res.json();
+            if (data.ok && data.googleClientId) {
+              googleClientId.value = data.googleClientId;
+
+              // Check if Google script is loaded
+              const checkGsi = setInterval(() => {
+                if (window.google?.accounts?.id) {
+                  clearInterval(checkGsi);
+                  google.accounts.id.initialize({
+                    client_id: data.googleClientId,
+                    callback: handleGoogleCredentialResponse,
+                    auto_select: false,
+                  });
+                  google.accounts.id.renderButton(
+                    document.getElementById('google-btn-container'),
+                    {
+                      theme: 'outline',
+                      size: 'large',
+                      width: '280',
+                      text: 'signin_with',
+                      shape: 'pill',
+                    }
+                  );
+                }
+              }, 100);
+            }
+          } catch (err) {
+            console.error('Lỗi khởi tạo cấu hình Google Auth:', err);
+          }
+        }
+
+        async function handleGoogleCredentialResponse(response) {
           loadingAuth.value = true;
           authError.value = '';
+
           try {
-            const res = await fetch('/api/auth/verify', {
+            const res = await fetch('/api/auth/google', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ key: secretInput.value.trim() })
+              body: JSON.stringify({ credential: response.credential }),
             });
+
             const data = await res.json();
             if (data.ok) {
-              token.value = secretInput.value.trim();
-              localStorage.setItem('dashboard_token', token.value);
+              token.value = data.token;
+              user.value = data.user;
+              localStorage.setItem('dashboard_session', data.token);
+              localStorage.setItem('dashboard_user', JSON.stringify(data.user));
               isAuthenticated.value = true;
               fetchData();
             } else {
-              authError.value = data.error || 'Mã xác thực không đúng!';
+              authError.value = data.error || 'Đăng nhập Google thất bại';
             }
           } catch (err) {
-            authError.value = 'Lỗi kết nối tới máy chủ API';
+            authError.value = 'Lỗi kết nối tới máy chủ xác thực';
           } finally {
             loadingAuth.value = false;
           }
         }
 
+        async function verifySession() {
+          if (!token.value) {
+            initGoogleAuth();
+            return;
+          }
+
+          try {
+            const res = await fetch('/api/auth/verify', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token.value}`,
+              },
+            });
+            const data = await res.json();
+            if (data.ok && data.authenticated) {
+              isAuthenticated.value = true;
+              if (data.user) user.value = data.user;
+              fetchData();
+            } else {
+              logout();
+            }
+          } catch {
+            logout();
+          }
+        }
+
         function logout() {
           token.value = '';
-          localStorage.removeItem('dashboard_token');
+          user.value = null;
+          localStorage.removeItem('dashboard_session');
+          localStorage.removeItem('dashboard_user');
           isAuthenticated.value = false;
+          nextTick(() => {
+            initGoogleAuth();
+          });
         }
 
         async function fetchData() {
@@ -385,16 +490,19 @@
         }
 
         onMounted(() => {
-          if (isAuthenticated.value) {
-            fetchData();
-            setInterval(fetchData, 15000); // Polling 15s
-          }
+          verifySession();
+          setInterval(() => {
+            if (isAuthenticated.value) {
+              fetchData();
+            }
+          }, 15000); // Polling 15s
         });
 
         return {
           token,
+          user,
           isAuthenticated,
-          secretInput,
+          googleClientId,
           authError,
           loadingAuth,
           system,
@@ -404,11 +512,10 @@
           searchQuery,
           toast,
           filteredDeployments,
-          verifyAuth,
           logout,
           fetchData,
           confirmUndeploy,
-          formatDate
+          formatDate,
         };
       }
     }).mount('#app');
