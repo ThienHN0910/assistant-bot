@@ -53,6 +53,7 @@ async function testTelegramDeploy() {
     // 4. Test createTextHandler with GitHub link and Vercel configured
     let inlineKeyboard = null;
     const mockCtxWithKeys = {
+      from: { id: 12345 },
       message: { text: 'https://github.com/org/vue-dashboard' },
       replyWithHTML: async (html, opts) => {
         repliedHtml = html;
@@ -70,9 +71,30 @@ async function testTelegramDeploy() {
     await handlerWithKeys(mockCtxWithKeys);
     assert(repliedHtml.includes('PHÁT HIỆN KHO LƯU TRỮ GITHUB'));
     assert(inlineKeyboard, 'Should produce inline keyboard');
-    assert.strictEqual(inlineKeyboard.length, 1, 'Should have 1 target button (Vercel)');
-    assert(inlineKeyboard[0][0].text.includes('Vercel'));
-    console.log('✅ textHandler GitHub detection and inline keyboard test passed');
+    assert.strictEqual(inlineKeyboard.length, 2, 'Should have 2 rows of buttons (target + control)');
+    assert(inlineKeyboard[0][0].text.includes('Vercel (vue-dashboard)'), 'Should include auto subdomain in button label');
+    assert(inlineKeyboard[1][0].text.includes('Đổi Subdomain'), 'Should have rename button');
+    assert(inlineKeyboard[1][1].text.includes('Hủy'), 'Should have cancel button');
+    console.log('✅ textHandler GitHub detection and 1-click inline keyboard test passed');
+
+    // 4b. Test awaiting subdomain rename input
+    const deployId = inlineKeyboard[0][0].callback_data.split(':')[1];
+    deployStore.setAwaitingSubdomain(12345, deployId);
+
+    const mockCtxRename = {
+      from: { id: 12345 },
+      message: { text: 'my-custom-sub' },
+      replyWithHTML: async (html, opts) => {
+        repliedHtml = html;
+        inlineKeyboard = opts?.reply_markup?.inline_keyboard;
+      },
+      reply: async () => {},
+    };
+    await handlerWithKeys(mockCtxRename);
+    assert(repliedHtml.includes('Đã cập nhật tên miền thành công!'));
+    assert(inlineKeyboard[0][0].text.includes('my-custom-sub'), 'Button should reflect custom subdomain');
+    assert.strictEqual(deployStore.getAwaitingSubdomain(12345), undefined, 'Awaiting state should be cleared');
+    console.log('✅ textHandler custom subdomain input test passed');
 
     // 5. Test createTextHandler with normal note
     const mockCtxNote = {
