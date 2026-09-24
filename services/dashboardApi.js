@@ -1,4 +1,6 @@
 const http = require('http');
+const crypto = require('crypto');
+const axios = require('axios');
 const si = require('systeminformation');
 const deployer = require('../lib/deployer');
 const { formatFileSize } = require('../config/utils');
@@ -36,24 +38,87 @@ function parseJsonBody(req) {
   });
 }
 
+function createSessionToken(email, secret) {
+  const payload = {
+    email: (email || '').toLowerCase().trim(),
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days expiration
+  };
+  const dataStr = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', secret || 'default-salt').update(dataStr).digest('base64url');
+  return `${dataStr}.${signature}`;
+}
+
+function verifySessionToken(token, secret, authorizedEmail) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+
+  const [dataStr, signature] = parts;
+  const expectedSig = crypto.createHmac('sha256', secret || 'default-salt').update(dataStr).digest('base64url');
+  if (signature !== expectedSig) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(dataStr, 'base64url').toString('utf8'));
+    if (payload.exp && Date.now() > payload.exp) return null;
+    if (authorizedEmail && payload.email !== authorizedEmail.toLowerCase().trim()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+async function verifyGoogleIdToken(idToken, client = axios) {
+  if (!idToken) {
+    return { ok: false, error: 'Thiếu Google ID Token' };
+  }
+
+  try {
+    const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
+    const res = await client.get(url, { timeout: 10000 });
+    const data = res.data;
+
+    if (!data || !data.email) {
+      return { ok: false, error: 'Token Google không hợp lệ hoặc thiếu email' };
+    }
+
+    return {
+      ok: true,
+      email: data.email.toLowerCase().trim(),
+      emailVerified: data.email_verified === 'true' || data.email_verified === true,
+      aud: data.aud,
+      name: data.name || data.email,
+      picture: data.picture || null,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.response?.data?.error_description || error.message || 'Lỗi khi xác thực token Google',
+    };
+  }
+}
+
 function checkAuth(req, config) {
-  if (!config.dashboardSecretKey) {
-    return true; // Unprotected if no secret key configured
+  // If no authorized email configured in dev, allow access
+  if (!config.authorizedGoogleEmail) {
+    return true;
   }
 
   const authHeader = req.headers.authorization || '';
   if (authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7).trim();
-    return token === config.dashboardSecretKey;
+    const verified = verifySessionToken(token, config.sessionSecret, config.authorizedGoogleEmail);
+    if (verified) {
+      req.user = verified;
+      return true;
+    }
   }
 
-  // Also accept ?key= query parameter
-  const urlObj = new URL(req.url, 'http://localhost');
-  const queryKey = urlObj.searchParams.get('key');
-  return queryKey === config.dashboardSecretKey;
+  return false;
 }
 
-function createDashboardServer(config) {
+function createDashboardServer(config, deps = {}) {
+  const httpClient = deps.axios || axios;
+
   const server = http.createServer(async (req, res) => {
     setCorsHeaders(res);
 
@@ -72,27 +137,95 @@ function createDashboardServer(config) {
       return;
     }
 
-    // 2. Auth verify
-    if (pathname === '/api/auth/verify' && req.method === 'POST') {
-      const body = await parseJsonBody(req);
-      const provided = body.key || req.headers.authorization?.replace(/^Bearer\s+/, '');
-      const valid = !config.dashboardSecretKey || provided === config.dashboardSecretKey;
+    // 2. Auth Config - Public endpoint returning Google Client ID for GIS button
+    if (pathname === '/api/auth/config' && req.method === 'GET') {
+      sendJson(res, 200, {
+        ok: true,
+        googleClientId: config.googleClientId || '',
+        authType: 'google',
+      });
+      return;
+    }
 
-      if (valid) {
-        sendJson(res, 200, { ok: true, authenticated: true });
-      } else {
-        sendJson(res, 401, { ok: false, error: 'Mã xác thực không chính xác' });
+    // 3. Google Sign-In Authentication Endpoint
+    if (pathname === '/api/auth/google' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        const credential = body.credential || body.id_token;
+
+        if (!credential) {
+          sendJson(res, 400, { ok: false, error: 'Thiếu Google Credential Token (credential)' });
+          return;
+        }
+
+        const verifyRes = await verifyGoogleIdToken(credential, httpClient);
+        if (!verifyRes.ok) {
+          sendJson(res, 401, { ok: false, error: verifyRes.error });
+          return;
+        }
+
+        // Verify authorized email
+        const targetEmail = (config.authorizedGoogleEmail || '').toLowerCase().trim();
+        if (targetEmail && verifyRes.email !== targetEmail) {
+          sendJson(res, 403, {
+            ok: false,
+            error: `Tài khoản Google (${verifyRes.email}) không có quyền truy cập hệ thống.`,
+          });
+          return;
+        }
+
+        // Verify Google Client ID if configured
+        if (config.googleClientId && verifyRes.aud && verifyRes.aud !== config.googleClientId) {
+          sendJson(res, 403, {
+            ok: false,
+            error: 'Google Client ID không khớp với cấu hình hệ thống.',
+          });
+          return;
+        }
+
+        const sessionToken = createSessionToken(verifyRes.email, config.sessionSecret);
+
+        sendJson(res, 200, {
+          ok: true,
+          token: sessionToken,
+          user: {
+            email: verifyRes.email,
+            name: verifyRes.name,
+            picture: verifyRes.picture,
+          },
+        });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message || 'Lỗi xử lý đăng nhập Google' });
       }
       return;
     }
 
-    // All subsequent endpoints require authentication
-    if (!checkAuth(req, config)) {
-      sendJson(res, 401, { ok: false, error: 'Yêu cầu mã xác thực hợp lệ (Unauthorized)' });
+    // 4. Session Token Verification Endpoint
+    if (pathname === '/api/auth/verify' && req.method === 'POST') {
+      const authHeader = req.headers.authorization || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
+
+      if (!token) {
+        sendJson(res, 401, { ok: false, error: 'Chưa cung cấp token phiên đăng nhập' });
+        return;
+      }
+
+      const verified = verifySessionToken(token, config.sessionSecret, config.authorizedGoogleEmail);
+      if (verified) {
+        sendJson(res, 200, { ok: true, authenticated: true, user: verified });
+      } else {
+        sendJson(res, 401, { ok: false, error: 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ' });
+      }
       return;
     }
 
-    // 3. System Status
+    // All subsequent endpoints require valid authentication
+    if (!checkAuth(req, config)) {
+      sendJson(res, 401, { ok: false, error: 'Yêu cầu đăng nhập Google hợp lệ (Unauthorized)' });
+      return;
+    }
+
+    // 5. System Status
     if (pathname === '/api/status' && req.method === 'GET') {
       try {
         const [cpu, mem, fsSize, time] = await Promise.all([
@@ -130,7 +263,7 @@ function createDashboardServer(config) {
       return;
     }
 
-    // 4. List All Deployments
+    // 6. List All Deployments
     if (pathname === '/api/deployments' && req.method === 'GET') {
       try {
         const deployments = await deployer.listAllDeployments(config);
@@ -141,7 +274,7 @@ function createDashboardServer(config) {
       return;
     }
 
-    // 5. Undeploy
+    // 7. Undeploy
     if (pathname === '/api/deployments/undeploy' && req.method === 'POST') {
       try {
         const body = await parseJsonBody(req);
@@ -180,6 +313,9 @@ function stopDashboardServer() {
 }
 
 module.exports = {
+  createSessionToken,
+  verifySessionToken,
+  verifyGoogleIdToken,
   createDashboardServer,
   startDashboardServer,
   stopDashboardServer,

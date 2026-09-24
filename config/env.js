@@ -47,8 +47,10 @@ function getConfig() {
   const renderApiKey = (process.env.RENDER_API_KEY || '').trim();
   const renderOwnerId = (process.env.RENDER_OWNER_ID || '').trim();
   const deployRegistryPath = toAbsolutePath(process.env.DEPLOY_REGISTRY_PATH || './data/deployments.json');
-  // Cấu hình Web Dashboard (Tùy chọn)
-  const dashboardSecretKey = (process.env.DASHBOARD_SECRET_KEY || '').trim();
+  // Cấu hình Web Dashboard (Đăng nhập Google OAuth 2.0 độc quyền)
+  const googleClientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  const authorizedGoogleEmail = (process.env.AUTHORIZED_GOOGLE_EMAIL || '').trim().toLowerCase();
+  const sessionSecret = (process.env.SESSION_SECRET || 'assistant-bot-dashboard-session-salt').trim();
   const dashboardPort = Number(process.env.DASHBOARD_PORT) || 3001;
 
   return {
@@ -67,7 +69,9 @@ function getConfig() {
     renderApiKey,
     renderOwnerId,
     deployRegistryPath,
-    dashboardSecretKey,
+    googleClientId,
+    authorizedGoogleEmail,
+    sessionSecret,
     dashboardPort,
   };
 }
