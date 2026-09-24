@@ -33,6 +33,7 @@ function getConfig() {
   const pm2ErrorLogPath = toAbsolutePath(requireEnv('PM2_ERROR_LOG_PATH'));
 
   // Cấu hình Web Sandbox & Deploy
+  const baseDomain = (process.env.BASE_DOMAIN || 'thienhn.io.vn').trim().toLowerCase();
   const webDeployDir = toAbsolutePath(process.env.WEB_DEPLOY_DIR || '/home/hnt/web');
   const uploadDir = toAbsolutePath(process.env.UPLOAD_DIR || '/home/hnt/uploads');
   const webPortStart = Number(process.env.WEB_PORT_START) || 8081;
@@ -43,6 +44,7 @@ function getConfig() {
     timezone,
     notesFilePath,
     pm2ErrorLogPath,
+    baseDomain,
     webDeployDir,
     uploadDir,
     webPortStart,
