@@ -232,6 +232,25 @@ async function testDeployer() {
     assert.strictEqual(rRes.ok, true);
     assert.strictEqual(rRes.cnameTarget, 'my-service.onrender.com');
     console.log('✅ render provider unit test passed');
+
+    // 10. Test resolveAvailableSubdomain collision suffix logic
+    const mockListDeployments = async () => [
+      { name: 'shop', domain: 'shop.thienhn.io.vn' },
+      { name: 'shop0', domain: 'shop0.thienhn.io.vn' },
+    ];
+    // Free subdomain
+    const freeSub = await deployer.resolveAvailableSubdomain('blog', allConfig, { listAllDeployments: mockListDeployments });
+    assert.strictEqual(freeSub, 'blog', 'Unused subdomain should return as is');
+
+    // First collision: shop is taken, shop0 is taken -> should return shop1
+    const collSub = await deployer.resolveAvailableSubdomain('shop', allConfig, { listAllDeployments: mockListDeployments });
+    assert.strictEqual(collSub, 'shop1', 'Should increment suffix from 0 to 1 when collision occurs');
+
+    // Single collision: only base taken -> should return base0
+    const mockListSingle = async () => [{ name: 'portal', domain: 'portal.thienhn.io.vn' }];
+    const singleColl = await deployer.resolveAvailableSubdomain('portal', allConfig, { listAllDeployments: mockListSingle });
+    assert.strictEqual(singleColl, 'portal0', 'Single collision should append 0');
+    console.log('✅ deployer resolveAvailableSubdomain collision suffix test passed');
   } finally {
     await fs.rm(testRoot, { recursive: true, force: true }).catch(() => {});
   }

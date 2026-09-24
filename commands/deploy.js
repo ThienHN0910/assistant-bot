@@ -223,5 +223,44 @@ module.exports = {
         await ctx.reply('⚠️ Lỗi khi kích hoạt deploy từ GitHub.');
       }
     });
+
+    // 4. Khi người dùng bấm đổi Subdomain cho GitHub Deploy
+    bot.action(/^git_rename:([a-zA-Z0-9]+)$/, async (ctx) => {
+      try {
+        const deployId = ctx.match[1];
+        const pending = deployStore.getPending(deployId);
+        if (!pending) {
+          await ctx.answerCbQuery('Yêu cầu đã hết hạn!');
+          await ctx.reply('⚠️ Yêu cầu deploy đã hết hạn. Vui lòng dán lại link GitHub.');
+          return;
+        }
+
+        deployStore.setAwaitingSubdomain(ctx.from?.id, deployId);
+        await ctx.answerCbQuery();
+        await ctx.replyWithHTML(
+          `✏️ <b>ĐỔI SUBDOMAIN CHO DỰ ÁN</b>\n\n` +
+          `• Dự án: <b>${escapeHtml(pending.projectName)}</b>\n` +
+          `• Subdomain hiện tại: <code>${escapeHtml(pending.subdomain)}</code>\n\n` +
+          `<i>Vui lòng nhập tên subdomain mới bạn muốn sử dụng (ví dụ: <code>my-cool-app</code>):</i>`
+        );
+      } catch (err) {
+        console.error('[GIT_RENAME_ACTION_ERROR]', err);
+      }
+    });
+
+    // 5. Khi người dùng bấm Hủy
+    bot.action(/^git_cancel:([a-zA-Z0-9]+)$/, async (ctx) => {
+      try {
+        const deployId = ctx.match[1];
+        deployStore.deletePending(deployId);
+        if (ctx.from?.id) {
+          deployStore.clearAwaitingSubdomain(ctx.from.id);
+        }
+        await ctx.answerCbQuery('Đã hủy yêu cầu deploy.');
+        await ctx.editMessageText('❌ Đã hủy yêu cầu triển khai GitHub.').catch(() => {});
+      } catch (err) {
+        console.error('[GIT_CANCEL_ACTION_ERROR]', err);
+      }
+    });
   },
 };
