@@ -1,19 +1,9 @@
-const axios = require('axios');
-const sandbox = require('../lib/sandbox');
+const deployer = require('../lib/deployer');
 const { escapeHtml } = require('../config/utils');
-
-async function getPublicIp() {
-  try {
-    const res = await axios.get('https://api.ipify.org?format=json', { timeout: 3000 });
-    return res.data?.ip || 'localhost';
-  } catch {
-    return 'localhost';
-  }
-}
 
 module.exports = {
   name: 'web_list',
-  description: 'Xem danh sách các web đang chạy trong sandbox',
+  description: 'Xem danh sách các web đang chạy (VPS, Vercel, Render)',
   execute: async (ctx, config) => {
     try {
       const text = ctx.message?.text || '';
@@ -21,28 +11,27 @@ module.exports = {
       if (args.includes('-h') || args.includes('--help')) {
         await ctx.replyWithHTML(
           `ℹ️ <b>Hướng dẫn lệnh /web_list</b>\n` +
-          `Liệt kê toàn bộ các web test đang chạy, port tương ứng, dung lượng chiếm dụng và link truy cập.\n\n` +
+          `Liệt kê toàn bộ các dự án đang chạy trên VPS, Vercel và Render kèm link tên miền.\n\n` +
           `<b>Cú pháp:</b> <code>/web_list</code>`
         );
         return;
       }
 
-      const deployments = await sandbox.listDeployments(config.webDeployDir);
+      const deployments = await deployer.listAllDeployments(config);
 
       if (!deployments.length) {
         await ctx.replyWithHTML(
-          `🌐 <b>CHƯA CÓ WEB NÀO TRONG SANDBOX</b>\n\n` +
-          `<i>Hãy upload file .zip và gõ <code>/deploy</code> để triển khai web đầu tiên!</i>`
+          `🌐 <b>CHƯA CÓ WEB NÀO ĐƯỢC TRIỂN KHAI</b>\n\n` +
+          `<i>Hãy upload file .zip hoặc dán link GitHub công khai để triển khai web đầu tiên!</i>`
         );
         return;
       }
 
-      const publicIp = await getPublicIp();
       const lines = [];
-      lines.push('🌐 <b>DANH SÁCH CÁC WEB ĐANG CHẠY TRÊN SERVER</b>\n');
+      lines.push('🌐 <b>DANH SÁCH DỰ ÁN ĐANG CHẠY (VPS & CLOUD)</b>\n');
 
       deployments.forEach((d, idx) => {
-        const url = d.url || (d.domain ? `https://${d.domain}` : (d.port ? `http://${publicIp}:${d.port}` : 'N/A'));
+        const url = d.url || (d.domain ? `https://${d.domain}` : (d.port ? `http://localhost:${d.port}` : 'N/A'));
         const typeLabel = d.type === 'backend' ? 'Node.js Backend' : 'Web Tĩnh';
         const deployedDate = d.deployedAt ? new Date(d.deployedAt).toLocaleString('vi-VN') : 'N/A';
         const targetLabel = d.target ? ` [${d.target.toUpperCase()}]` : '';
