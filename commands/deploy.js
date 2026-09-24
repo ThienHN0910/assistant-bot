@@ -34,16 +34,17 @@ async function handleDeployExecution(ctx, zipName, config, requestedPort = null)
 
     const result = await sandbox.deployProject(zipPath, projectName, port, config);
     const publicIp = await getPublicIp();
-    const url = `http://${publicIp}:${result.port}`;
+    const url = result.url || (result.domain ? `https://${result.domain}` : `http://${publicIp}:${result.port}`);
 
     await ctx.replyWithHTML(
       `🎉 <b>DEPLOY THÀNH CÔNG!</b>\n\n` +
       `• Dự án: <b>${escapeHtml(result.name)}</b>\n` +
+      `• Nền tảng: <code>VPS (Nginx)</code>\n` +
       `• Loại hình: <code>${result.type === 'backend' ? 'Node.js Backend' : 'Web Tĩnh / SPA'}</code>\n` +
-      `• Port: <b>${result.port}</b>\n` +
+      (result.domain ? `• Tên miền: <code>${escapeHtml(result.domain)}</code>\n` : '') +
       `• URL truy cập: <a href="${url}">${url}</a>\n\n` +
       `<i>Tiện ích tiếp theo:</i>\n` +
-      `• Kiểm tra hiệu năng: <code>/perf ${result.port}</code>\n` +
+      `• Kiểm tra hiệu năng: <code>/perf ${result.port || result.name}</code>\n` +
       `• Xem danh sách web: <code>/web_list</code>\n` +
       `• Gỡ bỏ web khi xong: <code>/web_remove ${result.name}</code>`
     );
