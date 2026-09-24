@@ -38,6 +38,10 @@ function getConfig() {
   const uploadDir = toAbsolutePath(process.env.UPLOAD_DIR || '/home/hnt/uploads');
   const webPortStart = Number(process.env.WEB_PORT_START) || 8081;
 
+  // Cấu hình Cloudflare DNS API (Tùy chọn)
+  const cloudflareApiToken = (process.env.CLOUDFLARE_API_TOKEN || '').trim();
+  const cloudflareZoneId = (process.env.CLOUDFLARE_ZONE_ID || '').trim();
+
   return {
     botToken,
     authorizedTelegramId,
@@ -48,6 +52,8 @@ function getConfig() {
     webDeployDir,
     uploadDir,
     webPortStart,
+    cloudflareApiToken,
+    cloudflareZoneId,
   };
 }
 
