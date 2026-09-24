@@ -42,6 +42,12 @@ function getConfig() {
   const cloudflareApiToken = (process.env.CLOUDFLARE_API_TOKEN || '').trim();
   const cloudflareZoneId = (process.env.CLOUDFLARE_ZONE_ID || '').trim();
 
+  // Cấu hình Vercel & Render (Tùy chọn)
+  const vercelToken = (process.env.VERCEL_TOKEN || '').trim();
+  const renderApiKey = (process.env.RENDER_API_KEY || '').trim();
+  const renderOwnerId = (process.env.RENDER_OWNER_ID || '').trim();
+  const deployRegistryPath = toAbsolutePath(process.env.DEPLOY_REGISTRY_PATH || './data/deployments.json');
+
   return {
     botToken,
     authorizedTelegramId,
@@ -54,6 +60,10 @@ function getConfig() {
     webPortStart,
     cloudflareApiToken,
     cloudflareZoneId,
+    vercelToken,
+    renderApiKey,
+    renderOwnerId,
+    deployRegistryPath,
   };
 }
 
