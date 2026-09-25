@@ -1,9 +1,47 @@
 <!DOCTYPE html>
-<html lang="vi" class="dark">
+<html lang="vi" class="dark scroll-smooth">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DevOps Dashboard | Assistant Bot</title>
+
+  <!-- SEO Optimization -->
+  <title>DevOps Dashboard | Assistant Bot & Cloud Sandbox</title>
+  <meta name="description" content="DevOps Dashboard & Telegram Dev Assistant Suite cho lập trình viên. Tự động hóa quản trị VPS 1GB RAM, deploy 1 chạm lên VPS Nginx, Vercel, Render kèm tự động hóa Cloudflare DNS.">
+  <meta name="keywords" content="DevOps, Telegram Bot, Cloudflare DNS, Vercel Deploy, Render Deploy, VPS GCP e2-micro, Nginx, Vue 3 Dashboard, Portfolio ThienHN, DevOps Orchestrator">
+  <meta name="author" content="ThienHN">
+  <link rel="canonical" href="https://bot.thienhn.io.vn/">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bot.thienhn.io.vn/">
+  <meta property="og:title" content="Dev Assistant Bot & Multi-Target Cloud Sandbox | ThienHN">
+  <meta property="og:description" content="Hệ sinh thái tự động hóa DevOps & Quản trị máy chủ cá nhân 1 chạm qua Telegram Bot và Web Dashboard, tích hợp Cloudflare DNS, Vercel & Render với trần RAM nghiêm ngặt 200MB.">
+  <meta property="og:site_name" content="Dev Assistant Bot">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://bot.thienhn.io.vn/">
+  <meta name="twitter:title" content="Dev Assistant Bot & Multi-Target Cloud Sandbox | ThienHN">
+  <meta name="twitter:description" content="Telegram Dev Assistant & Multi-Target Deployment Suite cho lập trình viên. Tự động hóa quản trị VPS 1GB RAM, deploy 1 chạm lên VPS Nginx, Vercel, Render kèm tự động hóa Cloudflare DNS.">
+
+  <!-- JSON-LD Structured Data for SEO -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Dev Assistant Bot",
+    "applicationCategory": "DevOpsApplication",
+    "operatingSystem": "Linux (Ubuntu / Debian), Cloud",
+    "description": "Telegram Dev Assistant & Multi-Target Deployment Suite cho lập trình viên. Tự động hóa quản trị VPS 1GB RAM, deploy 1 chạm lên VPS Nginx, Vercel, Render kèm tự động hóa Cloudflare DNS.",
+    "author": {
+      "@type": "Person",
+      "name": "ThienHN",
+      "url": "https://thienhn.io.vn"
+    },
+    "url": "https://bot.thienhn.io.vn/"
+  }
+  </script>
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -14,6 +52,8 @@
           colors: {
             brand: {
               50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
               500: '#6366f1',
               600: '#4f46e5',
               700: '#4338ca',
@@ -23,80 +63,519 @@
       }
     }
   </script>
+
   <!-- Vue 3 CDN -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <!-- Google Identity Services (GIS) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <style>
     [v-cloak] { display: none; }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #020617; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
-  <div id="app" v-cloak class="p-4 md:p-8 max-w-7xl mx-auto">
-    <!-- 1. AUTH SCREEN (Google OAuth 2.0) -->
-    <div v-if="!isAuthenticated" class="min-h-[85vh] flex items-center justify-center">
-      <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center">
-        <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-tr from-brand-600/20 to-brand-500/10 text-brand-400 mb-6 border border-brand-500/20 shadow-inner">
-          <svg class="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
-        </div>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-brand-500/30 selection:text-brand-300">
+  <div id="app" v-cloak class="min-h-screen flex flex-col">
 
-        <h1 class="text-2xl md:text-3xl font-extrabold mb-2 bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-          DevOps Dashboard
-        </h1>
-        <p class="text-slate-400 text-sm mb-6 leading-relaxed">
-          Hệ thống bảo mật cao với Google OAuth 2.0. Chỉ tài khoản Google được ủy quyền mới có thể truy cập.
-        </p>
-
-        <!-- Loading State -->
-        <div v-if="loadingAuth" class="py-6 flex flex-col items-center justify-center gap-3">
-          <div class="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-          <span class="text-sm text-slate-400 font-medium">Đang xác thực tài khoản Google...</span>
-        </div>
-
-        <!-- Google Sign-In Button Container -->
-        <div v-show="!loadingAuth" class="flex flex-col items-center justify-center py-2">
-          <div id="google-btn-container" class="min-h-[44px] flex justify-center"></div>
-
-          <div v-if="!googleClientId" class="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs text-left">
-            ⚠️ <b>Chưa cấu hình GOOGLE_CLIENT_ID:</b><br/>
-            Vui lòng mở file <code>.env</code> trên máy chủ và cập nhật <code>GOOGLE_CLIENT_ID</code> theo hướng dẫn trong <code>.env.example</code>.
+    <!-- ===================================================================== -->
+    <!-- NAVIGATION BAR (Shared Header)                                         -->
+    <!-- ===================================================================== -->
+    <header class="sticky top-0 z-40 bg-slate-950/85 backdrop-blur-md border-b border-slate-800">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <!-- Logo & Branding -->
+        <a href="#overview" @click="currentTab = 'showcase'" class="flex items-center gap-3 group">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-xl shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform">
+            🤖
           </div>
-        </div>
+          <div>
+            <div class="font-bold text-base sm:text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent flex items-center gap-2">
+              Dev Assistant Bot
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20 font-mono font-normal">v2.0</span>
+            </div>
+            <div class="text-[11px] text-slate-400 hidden sm:block">Telegram & Cloud Sandbox Suite</div>
+          </div>
+        </a>
 
-        <!-- Error Alert -->
-        <div v-if="authError" class="mt-5 p-3.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
-          <span>⚠️</span>
-          <span>{{ authError }}</span>
-        </div>
+        <!-- Desktop Navigation Links -->
+        <nav class="hidden md:flex items-center gap-1 text-sm font-medium text-slate-300">
+          <a href="#overview" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors">Tổng quan</a>
+          <a href="#architecture" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors">Kiến trúc</a>
+          <a href="#commands" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors flex items-center gap-1.5">
+            <span>Danh mục Lệnh</span>
+            <span class="text-xs px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">{{ commands.length }}</span>
+          </a>
+          <a href="#highlights" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors">Điểm sáng Kỹ thuật</a>
+          <a href="https://thienhn.io.vn/" target="_blank" class="px-3 py-1.5 rounded-lg text-brand-400 hover:text-brand-300 flex items-center gap-1">
+            <span>Portfolio</span>
+            <span class="text-xs">↗</span>
+          </a>
+        </nav>
 
-        <div class="mt-8 pt-6 border-t border-slate-800 text-xs text-slate-500">
-          Assistant Bot • Multi-Cloud DevOps Orchestrator
+        <!-- Right Action Button -->
+        <div class="flex items-center gap-2.5">
+          <!-- When Logged In -->
+          <template v-if="isAuthenticated">
+            <button 
+              @click="currentTab = (currentTab === 'showcase' ? 'dashboard' : 'showcase')"
+              class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-xs sm:text-sm font-medium transition-all flex items-center gap-2">
+              <span v-if="currentTab === 'showcase'">📊 Vào Dashboard</span>
+              <span v-else>👁️ Xem Landing Page</span>
+            </button>
+            <button 
+              @click="logout" 
+              class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs sm:text-sm font-medium transition-all">
+              Đăng xuất
+            </button>
+          </template>
+
+          <!-- When Guest (Not logged in) -->
+          <template v-else>
+            <button 
+              @click="openLoginModal"
+              class="px-4 py-2 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl text-xs sm:text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2">
+              <span>🔐</span>
+              <span>Đăng nhập Quản trị</span>
+            </button>
+          </template>
         </div>
       </div>
-    </div>
+    </header>
 
-    <!-- 2. MAIN DASHBOARD -->
-    <div v-else class="space-y-8">
-      <!-- HEADER -->
-      <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800 pb-6">
+    <!-- ===================================================================== -->
+    <!-- VIEW A: GUEST SHOWCASE / LANDING PAGE (Public & SEO Optimized)         -->
+    <!-- ===================================================================== -->
+    <main v-if="currentTab === 'showcase'" class="flex-grow">
+      
+      <!-- HERO SECTION -->
+      <section id="overview" class="relative overflow-hidden pt-12 pb-20 md:pt-20 md:pb-28 border-b border-slate-900">
+        <!-- Glow gradient background -->
+        <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-brand-600/15 blur-[120px] pointer-events-none rounded-full"></div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+          <!-- Badges -->
+          <div class="inline-flex flex-wrap items-center justify-center gap-2 mb-6">
+            <span class="px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              GCP e2-micro (1 vCPU / 1 GB RAM)
+            </span>
+            <span class="px-3 py-1 rounded-full text-xs font-medium bg-brand-500/10 text-brand-400 border border-brand-500/20">
+              ⚡ Trần RAM 200MB An Toàn
+            </span>
+            <span class="px-3 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              ☁️ Cloudflare DNS Tự Động
+            </span>
+          </div>
+
+          <!-- Main Title -->
+          <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight max-w-4xl mx-auto leading-tight sm:leading-tight">
+            Telegram Dev Assistant &
+            <span class="bg-gradient-to-r from-brand-400 via-indigo-300 to-sky-400 bg-clip-text text-transparent">
+              Multi-Target Cloud Sandbox
+            </span>
+          </h1>
+
+          <!-- Subtitle -->
+          <p class="mt-6 text-slate-400 text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
+            Hệ sinh thái tự động hóa DevOps & Quản trị máy chủ cá nhân 1 chạm qua Telegram Bot và Web Dashboard. 
+            Tự động phát hiện loại dự án GitHub, deploy linh hoạt lên <b>VPS Nginx, Vercel hoặc Render</b> và tự động cấp subdomain Cloudflare HTTPS.
+          </p>
+
+          <!-- Action Buttons -->
+          <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <a href="#commands" class="px-6 py-3 rounded-2xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-sm transition-all shadow-xl shadow-brand-500/25 flex items-center gap-2">
+              <span>📋</span>
+              <span>Khám phá 16 Lệnh Telegram</span>
+            </a>
+            <a href="#architecture" class="px-6 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center gap-2">
+              <span>🏗️</span>
+              <span>Xem Kiến trúc Hệ thống</span>
+            </a>
+            <button @click="openLoginModal" class="px-6 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-brand-500/30 text-brand-300 font-semibold text-sm transition-all flex items-center gap-2">
+              <span>🔐</span>
+              <span>Đăng nhập Quản trị viên</span>
+            </button>
+          </div>
+
+          <!-- Metrics Highlights Strip -->
+          <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto text-left">
+            <div class="bg-slate-900/60 border border-slate-800/80 p-4.5 rounded-2xl backdrop-blur-sm">
+              <div class="text-xs text-slate-400 font-medium">Cấu hình Máy chủ</div>
+              <div class="text-xl sm:text-2xl font-bold text-white mt-1">1 vCPU / 1GB</div>
+              <div class="text-[11px] text-emerald-400 mt-1 flex items-center gap-1">
+                <span>✓</span> Zero-Overhead PM2
+              </div>
+            </div>
+
+            <div class="bg-slate-900/60 border border-slate-800/80 p-4.5 rounded-2xl backdrop-blur-sm">
+              <div class="text-xs text-slate-400 font-medium">Giới hạn Bộ nhớ Bot</div>
+              <div class="text-xl sm:text-2xl font-bold text-white mt-1">&le; 200 MB</div>
+              <div class="text-[11px] text-brand-400 mt-1 flex items-center gap-1">
+                <span>✓</span> OOM-Safe Watchdog
+              </div>
+            </div>
+
+            <div class="bg-slate-900/60 border border-slate-800/80 p-4.5 rounded-2xl backdrop-blur-sm">
+              <div class="text-xs text-slate-400 font-medium">Nền tảng Hỗ trợ</div>
+              <div class="text-xl sm:text-2xl font-bold text-white mt-1">VPS + Cloud</div>
+              <div class="text-[11px] text-purple-400 mt-1 flex items-center gap-1">
+                <span>✓</span> VPS, Vercel, Render
+              </div>
+            </div>
+
+            <div class="bg-slate-900/60 border border-slate-800/80 p-4.5 rounded-2xl backdrop-blur-sm">
+              <div class="text-xs text-slate-400 font-medium">Đo đạc Hiệu năng</div>
+              <div class="text-xl sm:text-2xl font-bold text-white mt-1">0 MB RAM</div>
+              <div class="text-[11px] text-amber-400 mt-1 flex items-center gap-1">
+                <span>✓</span> TTFB curl & PageSpeed
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ARCHITECTURE & WORKFLOW SECTION -->
+      <section id="architecture" class="py-16 md:py-24 border-b border-slate-900 bg-slate-950/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center max-w-3xl mx-auto mb-16">
+            <span class="text-xs font-bold text-brand-400 uppercase tracking-widest bg-brand-500/10 px-3 py-1 rounded-full border border-brand-500/20">
+              Kiến Trúc Luồng Hoạt Động
+            </span>
+            <h2 class="text-2xl sm:text-4xl font-extrabold mt-4 text-white">
+              Điều Phối Triển Khai 1 Chạm Đa Nền Tảng
+            </h2>
+            <p class="text-slate-400 text-sm sm:text-base mt-3">
+              Mô hình tách biệt giữa Telegram Bot, Nginx Reverse Proxy, Vercel/Render Edge và Cloudflare DNS REST API.
+            </p>
+          </div>
+
+          <!-- Flow Steps Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+            <!-- Step 1 -->
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl relative flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-2xl mb-4">
+                  📥
+                </div>
+                <div class="text-xs font-mono text-brand-400 font-semibold mb-1">BƯỚC 1: TIẾP NHẬN</div>
+                <h3 class="text-lg font-bold text-white mb-2">Nguồn Dự Án</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">
+                  Người dùng gửi file <code>.zip</code> qua Telegram (<code>/deploy</code>) hoặc dán đường dẫn <b>GitHub Public Repo</b> trực tiếp vào chat hoặc Dashboard.
+                </p>
+              </div>
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500">
+                Hỗ trợ cả Monorepo FE + BE
+              </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl relative flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-2xl mb-4">
+                  🔍
+                </div>
+                <div class="text-xs font-mono text-sky-400 font-semibold mb-1">BƯỚC 2: PHÂN TÍCH</div>
+                <h3 class="text-lg font-bold text-white mb-2">Smart Inspector</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">
+                  Tự động phân tích cây thư mục từ xa (không git clone): phát hiện Web tĩnh thuần (HTML/CSS), Single Page App (React/Vue/Vite), hoặc Node.js Backend API.
+                </p>
+              </div>
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500">
+                Đề xuất nền tảng tiết kiệm RAM nhất
+              </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl relative flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-2xl mb-4">
+                  ⚙️
+                </div>
+                <div class="text-xs font-mono text-purple-400 font-semibold mb-1">BƯỚC 3: TRIỂN KHAI</div>
+                <h3 class="text-lg font-bold text-white mb-2">Multi-Target</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">
+                  - <b>VPS Nginx</b>: Web tĩnh thuần & Backend nhẹ.<br/>
+                  - <b>Vercel Edge</b>: Frontend SPA (React, Vue) không tốn RAM VPS.<br/>
+                  - <b>Render Cloud</b>: Backend Service cho Monorepo.
+                </p>
+              </div>
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500">
+                Tự động hash & upload file trực tiếp
+              </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl relative flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl mb-4">
+                  ☁️
+                </div>
+                <div class="text-xs font-mono text-emerald-400 font-semibold mb-1">BƯỚC 4: ROUTING</div>
+                <h3 class="text-lg font-bold text-white mb-2">Cloudflare DNS</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">
+                  Tự động gọi Cloudflare REST API: cấp <b>Bản ghi A</b> (trỏ về IP VPS) hoặc <b>Bản ghi CNAME</b> (trỏ về Vercel/Render) cho <code>*.thienhn.io.vn</code>.
+                </p>
+              </div>
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500">
+                Thu hồi DNS sạch sẽ khi xóa web
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- INTERACTIVE TELEGRAM COMMANDS HUB -->
+      <section id="commands" class="py-16 md:py-24 border-b border-slate-900">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12">
+            <div>
+              <span class="text-xs font-bold text-brand-400 uppercase tracking-widest bg-brand-500/10 px-3 py-1 rounded-full border border-brand-500/20">
+                Trung Tâm Lệnh Telegram
+              </span>
+              <h2 class="text-2xl sm:text-4xl font-extrabold mt-3 text-white">
+                Danh Mục 16 Lệnh Điều Khiển Tương Tác
+              </h2>
+              <p class="text-slate-400 text-sm mt-1">
+                Tất cả các lệnh sẵn sàng thực thi trực tiếp qua chat Telegram với quyền hạn được kiểm soát an toàn.
+              </p>
+            </div>
+
+            <!-- Filter Categories & Search Bar -->
+            <div class="flex flex-wrap items-center gap-3">
+              <!-- Category Tabs -->
+              <div class="flex flex-wrap bg-slate-900 p-1 rounded-2xl border border-slate-800 text-xs">
+                <button 
+                  v-for="cat in commandCategories" 
+                  :key="cat.id"
+                  @click="selectedCategory = cat.id"
+                  :class="selectedCategory === cat.id ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white'"
+                  class="px-3 py-1.5 rounded-xl font-medium transition-all">
+                  {{ cat.name }} ({{ getCategoryCount(cat.id) }})
+                </button>
+              </div>
+
+              <!-- Search Input -->
+              <div class="relative w-full sm:w-56">
+                <input 
+                  type="text" 
+                  v-model="commandSearch" 
+                  placeholder="Tìm lệnh, ví dụ: perf..." 
+                  class="w-full px-3.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Commands Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div 
+              v-for="cmd in filteredCommands" 
+              :key="cmd.name"
+              class="bg-slate-900 border border-slate-800 hover:border-slate-700 p-6 rounded-3xl transition-all hover:shadow-xl hover:shadow-brand-500/5 flex flex-col justify-between group">
+              
+              <div>
+                <!-- Top Header: Command Tag & Copy Button -->
+                <div class="flex items-center justify-between gap-3 mb-3">
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono text-base font-bold text-white bg-slate-950 px-3 py-1 rounded-xl border border-slate-800 text-brand-400">
+                      {{ cmd.name }}
+                    </span>
+                    <span 
+                      class="text-[10px] px-2 py-0.5 rounded-full font-semibold border"
+                      :class="cmd.badgeColor">
+                      {{ cmd.badge }}
+                    </span>
+                  </div>
+
+                  <button 
+                    @click="copyCommand(cmd.syntax)"
+                    :title="copiedCommand === cmd.syntax ? 'Đã sao chép!' : 'Sao chép lệnh'"
+                    class="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white transition-colors text-xs flex items-center gap-1">
+                    <span v-if="copiedCommand === cmd.syntax" class="text-emerald-400 font-bold text-[11px]">✓ Đã chép</span>
+                    <span v-else>📋</span>
+                  </button>
+                </div>
+
+                <!-- Description -->
+                <p class="text-slate-300 text-xs leading-relaxed mb-4">
+                  {{ cmd.description }}
+                </p>
+
+                <!-- Syntax Snippet -->
+                <div class="mb-4">
+                  <div class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Cú pháp sử dụng:</div>
+                  <div class="bg-slate-950 p-2.5 rounded-xl font-mono text-xs text-brand-300 border border-slate-800/80 break-all select-all">
+                    {{ cmd.syntax }}
+                  </div>
+                </div>
+
+                <!-- Technical Highlight -->
+                <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60 text-[11px] text-slate-400 flex items-start gap-2">
+                  <span class="text-brand-400 mt-0.5">⚡</span>
+                  <span>{{ cmd.highlights }}</span>
+                </div>
+              </div>
+
+              <!-- Telegram Sample Output Accordion -->
+              <div class="mt-4 pt-4 border-t border-slate-800">
+                <button 
+                  @click="cmd.showPreview = !cmd.showPreview"
+                  class="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 transition-colors py-1">
+                  <span class="flex items-center gap-1.5 font-medium">
+                    <span>💬</span>
+                    <span>Xem mẫu tin nhắn bot trả về</span>
+                  </span>
+                  <span class="transform transition-transform text-slate-500" :class="{'rotate-180': cmd.showPreview}">▼</span>
+                </button>
+
+                <!-- Simulated Telegram Dark Mode Bubble -->
+                <div v-show="cmd.showPreview" class="mt-2.5 p-3.5 rounded-2xl bg-[#1e293b] border border-slate-700/60 text-[11px] font-sans text-slate-200 shadow-inner">
+                  <div class="flex items-center gap-2 mb-2 pb-1.5 border-b border-slate-700/50 text-[10px] text-slate-400 font-mono">
+                    <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                    <span>Assistant bot vmi (Telegram response)</span>
+                  </div>
+                  <pre class="whitespace-pre-wrap font-sans text-slate-100 text-xs leading-relaxed">{{ cmd.sampleOutput }}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ENGINEERING HIGHLIGHTS & CV HIGHLIGHTS -->
+      <section id="highlights" class="py-16 md:py-24 border-b border-slate-900 bg-slate-950/40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center max-w-3xl mx-auto mb-16">
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+              Kỹ Thuật Điểm Nhấn (CV Highlights)
+            </span>
+            <h2 class="text-2xl sm:text-4xl font-extrabold mt-3 text-white">
+              Tối Ưu Hóa Tuyệt Đối Cho Máy Chủ Yếu
+            </h2>
+            <p class="text-slate-400 text-sm sm:text-base mt-2">
+              Lý do giải pháp này hoạt động ổn định liên tục trên máy chủ GCP 1GB RAM mà không gặp tình trạng nghẽn hay sập OOM.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            <!-- Card 1 -->
+            <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl flex gap-5">
+              <div class="text-3xl p-3 bg-brand-500/10 border border-brand-500/20 rounded-2xl h-fit">
+                🛡️
+              </div>
+              <div>
+                <h3 class="text-lg font-bold text-white mb-2">Trần Bộ Nhớ 200MB & Miễn Nhiễm OOM</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">
+                  Thiết lập cờ <code>--max-memory-restart 200M</code> trên PM2 cho toàn bộ chu trình khởi động và tự động cập nhật (<code>/update</code>). 
+                  Cơ chế đọc log lỗi <code>/logs</code> sử dụng thuật toán đọc ngược byte từ cuối file (OOM-Safe reverse tailing), tiêu thụ chính xác 0 MB RAM phụ trội bất kể dung lượng file log.
+                </p>
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl flex gap-5">
+              <div class="text-3xl p-3 bg-sky-500/10 border border-sky-500/20 rounded-2xl h-fit">
+                🐙
+              </div>
+              <div>
+                <h3 class="text-lg font-bold text-white mb-2">Không Chạy Git Clone Nặng Đĩa</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">
+                  Thay vì dùng <code>git clone</code> tải toàn bộ lịch sử commit gây ngốn RAM và bộ nhớ ổ đĩa hạn hẹp của VPS, hệ thống gọi trực tiếp GitHub REST API tải zipball nén của commit mới nhất. Tự động làm phẳng cây thư mục lồng để Nginx phục vụ ngay lập tức.
+                </p>
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl flex gap-5">
+              <div class="text-3xl p-3 bg-purple-500/10 border border-purple-500/20 rounded-2xl h-fit">
+                ⚡
+              </div>
+              <div>
+                <h3 class="text-lg font-bold text-white mb-2">Phân Lập Nền Tảng Thông Minh</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">
+                  Các dự án Frontend nặng (React, Vue, Vite, Next.js) được tự động điều hướng sang Vercel Edge Server để build và host hoàn toàn miễn phí. Máy chủ VPS chỉ đảm nhận Web tĩnh thuần và Node.js Backend, giữ tải CPU máy chủ luôn dưới 5%.
+                </p>
+              </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl flex gap-5">
+              <div class="text-3xl p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl h-fit">
+                🔒
+              </div>
+              <div>
+                <h3 class="text-lg font-bold text-white mb-2">Bảo Mật Zero-Leakage & Google OAuth 2.0</h3>
+                <p class="text-slate-400 text-xs leading-relaxed">
+                  Phân quyền 2 lớp độc lập: Telegram ID Whitelist cho các lệnh chat, và Google OAuth 2.0 kèm Whitelist Email cho Web Dashboard. 
+                  Lệnh shell <code>/sh</code> bị cô lập theo danh mục whitelist nghiêm ngặt, chặn hoàn toàn command injection.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PORTFOLIO & CASE STUDY BANNER -->
+      <section class="py-16 md:py-20 border-b border-slate-900 bg-gradient-to-b from-slate-950 to-slate-900">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-semibold mb-4">
+            💼 Tech Portfolio Project
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-white">
+            Khám Phá Thêm Bài Viết Kiến Trúc & Các Dự Án Khác
+          </h2>
+          <p class="text-slate-400 text-sm max-w-2xl mx-auto mt-3">
+            Dự án này là một thành phần trong danh mục giải pháp DevOps & Cloud Automation được chia sẻ chi tiết trên portfolio kỹ thuật của tác giả.
+          </p>
+
+          <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
+            <a href="https://thienhn.io.vn/projects/assisstantbot-telegram-overview" target="_blank" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sm font-semibold text-white transition-all flex items-center gap-2">
+              <span>📖</span>
+              <span>Đọc Case Study Chi Tiết</span>
+              <span>↗</span>
+            </a>
+            <a href="https://thienhn.io.vn/blog/zero-overhead-vps-orchestration-telegram-bot-pm2-nginx" target="_blank" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sm font-semibold text-white transition-all flex items-center gap-2">
+              <span>📝</span>
+              <span>Bài Viết Về Kiến Trúc VPS</span>
+              <span>↗</span>
+            </a>
+            <a href="https://github.com/ThienHN0910/assistant-bot" target="_blank" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-sm font-semibold text-white transition-all flex items-center gap-2 shadow-lg shadow-brand-500/20">
+              <span>🐙</span>
+              <span>GitHub Repository</span>
+              <span>↗</span>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW B: AUTHENTICATED DASHBOARD (Logged-In User)                       -->
+    <!-- ===================================================================== -->
+    <main v-else class="flex-grow p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-8">
+      
+      <!-- SUB-HEADER / TAB NAVIGATION -->
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800 pb-6">
         <div>
           <div class="flex items-center gap-3">
             <span class="text-3xl">🚀</span>
-            <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
-              Dev Assistant Dashboard
+            <h1 class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent">
+              Trung Tâm Điều Khiển DevOps
             </h1>
             <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Live
             </span>
           </div>
-          <p class="text-slate-400 text-sm mt-1">Giám sát và quản lý hạ tầng VPS, Vercel và Render</p>
+          <p class="text-slate-400 text-xs sm:text-sm mt-1">
+            Quản trị thời gian thực cho máy chủ VPS, Cloudflare DNS và các ứng dụng Vercel/Render
+          </p>
         </div>
 
-        <div class="flex items-center gap-3">
-          <!-- Logged in Google User Info -->
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- User Profile -->
           <div v-if="user" class="flex items-center gap-2.5 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl">
             <img v-if="user.picture" :src="user.picture" alt="Avatar" class="w-7 h-7 rounded-full border border-slate-700" />
             <div class="text-left hidden sm:block">
@@ -105,6 +584,7 @@
             </div>
           </div>
 
+          <!-- Deploy button -->
           <button 
             @click="openDeployModal" 
             class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2">
@@ -112,6 +592,7 @@
             Triển khai mới
           </button>
 
+          <!-- Refresh button -->
           <button 
             @click="fetchData" 
             :disabled="refreshing" 
@@ -119,77 +600,112 @@
             <span :class="{'animate-spin': refreshing}">🔄</span>
             Làm mới
           </button>
-          <button 
-            @click="logout" 
-            class="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-sm font-medium transition-all">
-            Đăng xuất
-          </button>
         </div>
-      </header>
+      </div>
 
-      <!-- SYSTEM TELEMETRY -->
-      <section v-if="system" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- CPU -->
-        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Tải CPU</div>
-          <div class="text-3xl font-extrabold">{{ system.cpuLoad }}%</div>
-          <div class="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
-            <div 
-              class="h-full rounded-full transition-all duration-500" 
-              :class="system.cpuLoad >= 80 ? 'bg-rose-500' : (system.cpuLoad >= 50 ? 'bg-amber-500' : 'bg-brand-500')"
-              :style="{ width: `${system.cpuLoad}%` }">
+      <!-- DASHBOARD TABS SWITCHER -->
+      <div class="flex items-center gap-2 border-b border-slate-800 pb-3 text-sm">
+        <button 
+          @click="dashTab = 'telemetry'"
+          :class="dashTab === 'telemetry' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
+          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2">
+          <span>🖥️</span>
+          <span>Giám sát VPS & Telemetry</span>
+        </button>
+
+        <button 
+          @click="dashTab = 'deployments'"
+          :class="dashTab === 'deployments' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
+          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2">
+          <span>🌐</span>
+          <span>Danh Sách Dịch Vụ</span>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-950 font-mono">{{ deployments.length }}</span>
+        </button>
+
+        <button 
+          @click="dashTab = 'commands'"
+          :class="dashTab === 'commands' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
+          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2">
+          <span>📋</span>
+          <span>Trung Tâm Lệnh Telegram</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: SYSTEM TELEMETRY -->
+      <section v-if="dashTab === 'telemetry' && system" class="space-y-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- CPU -->
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+            <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Tải CPU</div>
+            <div class="text-3xl font-extrabold">{{ system.cpuLoad }}%</div>
+            <div class="w-full bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
+              <div 
+                class="h-full rounded-full transition-all duration-500" 
+                :class="system.cpuLoad >= 80 ? 'bg-rose-500' : (system.cpuLoad >= 50 ? 'bg-amber-500' : 'bg-brand-500')"
+                :style="{ width: `${system.cpuLoad}%` }">
+              </div>
+            </div>
+          </div>
+
+          <!-- RAM -->
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+            <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Bộ Nhớ RAM</div>
+            <div class="text-3xl font-extrabold">{{ system.memory.usedPercentage }}%</div>
+            <div class="text-xs text-slate-400 mt-1">{{ system.memory.formatted }}</div>
+            <div class="w-full bg-slate-800 h-2 rounded-full mt-2 overflow-hidden">
+              <div 
+                class="h-full rounded-full transition-all duration-500" 
+                :class="system.memory.usedPercentage >= 80 ? 'bg-rose-500' : 'bg-emerald-500'"
+                :style="{ width: `${system.memory.usedPercentage}%` }">
+              </div>
+            </div>
+          </div>
+
+          <!-- DISK -->
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+            <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Ổ Đĩa Gốc (/)</div>
+            <div class="text-3xl font-extrabold">{{ system.disk.usedPercentage }}%</div>
+            <div class="text-xs text-slate-400 mt-1">{{ system.disk.formatted }}</div>
+            <div class="w-full bg-slate-800 h-2 rounded-full mt-2 overflow-hidden">
+              <div 
+                class="h-full rounded-full transition-all duration-500" 
+                :class="system.disk.usedPercentage >= 90 ? 'bg-rose-500' : 'bg-brand-500'"
+                :style="{ width: `${system.disk.usedPercentage}%` }">
+              </div>
+            </div>
+          </div>
+
+          <!-- UPTIME -->
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+            <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Thời Gian Chạy</div>
+            <div class="text-2xl font-bold mt-1 text-slate-200">{{ system.uptimeFormatted }}</div>
+            <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Hệ thống hoạt động tốt
             </div>
           </div>
         </div>
 
-        <!-- RAM -->
-        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Bộ Nhớ RAM</div>
-          <div class="text-3xl font-extrabold">{{ system.memory.usedPercentage }}%</div>
-          <div class="text-xs text-slate-400 mt-1">{{ system.memory.formatted }}</div>
-          <div class="w-full bg-slate-800 h-2 rounded-full mt-2 overflow-hidden">
-            <div 
-              class="h-full rounded-full transition-all duration-500" 
-              :class="system.memory.usedPercentage >= 80 ? 'bg-rose-500' : 'bg-emerald-500'"
-              :style="{ width: `${system.memory.usedPercentage}%` }">
-            </div>
+        <!-- System Quick Actions & Bot Health Banner -->
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h3 class="text-base font-bold text-white">Trạng Thái Watchdog & PM2</h3>
+            <p class="text-slate-400 text-xs mt-0.5">Tiến trình bot được bảo vệ nghiêm ngặt với trần RAM 200MB và tự động cảnh báo qua Telegram khi tài nguyên vượt 85%.</p>
           </div>
-        </div>
-
-        <!-- DISK -->
-        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Ổ Đĩa Gốc (/)</div>
-          <div class="text-3xl font-extrabold">{{ system.disk.usedPercentage }}%</div>
-          <div class="text-xs text-slate-400 mt-1">{{ system.disk.formatted }}</div>
-          <div class="w-full bg-slate-800 h-2 rounded-full mt-2 overflow-hidden">
-            <div 
-              class="h-full rounded-full transition-all duration-500" 
-              :class="system.disk.usedPercentage >= 90 ? 'bg-rose-500' : 'bg-brand-500'"
-              :style="{ width: `${system.disk.usedPercentage}%` }">
-            </div>
-          </div>
-        </div>
-
-        <!-- UPTIME -->
-        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-          <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Thời Gian Chạy</div>
-          <div class="text-2xl font-bold mt-1 text-slate-200">{{ system.uptimeFormatted }}</div>
-          <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Hệ thống ổn định
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400">Gõ <code>/status</code> trên Telegram để xem tức thì.</span>
           </div>
         </div>
       </section>
 
-      <!-- DEPLOYMENTS CONTROLS & TABLE -->
-      <section class="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+      <!-- TAB 2: DEPLOYMENTS TABLE -->
+      <section v-if="dashTab === 'deployments'" class="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
         <div class="p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 class="text-xl font-bold">Danh Sách Dịch Vụ Đã Triển Khai</h2>
+            <h2 class="text-xl font-bold">Danh Sách Dịch Vụ Đang Triển Khai</h2>
             <p class="text-slate-400 text-xs mt-1">Tổng cộng: {{ filteredDeployments.length }} ứng dụng đang hoạt động</p>
           </div>
 
           <div class="flex flex-wrap items-center gap-3">
-            <!-- Filter by target -->
             <select 
               v-model="targetFilter" 
               class="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-brand-500">
@@ -199,7 +715,6 @@
               <option value="render">🔷 Render</option>
             </select>
 
-            <!-- Search box -->
             <input 
               type="text" 
               v-model="searchQuery" 
@@ -209,7 +724,6 @@
           </div>
         </div>
 
-        <!-- TABLE -->
         <div class="overflow-x-auto">
           <table class="w-full text-left text-sm text-slate-300">
             <thead class="bg-slate-950/50 text-slate-400 uppercase text-xs tracking-wider border-b border-slate-800">
@@ -292,120 +806,250 @@
           </table>
         </div>
       </section>
+
+      <!-- TAB 3: TELEGRAM COMMANDS HUB (Inside Dashboard) -->
+      <section v-if="dashTab === 'commands'" class="space-y-6">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white">Tra Cứu Lệnh Telegram</h2>
+            <p class="text-slate-400 text-xs mt-1">Sao chép nhanh lệnh để gửi trực tiếp cho bot hoặc tìm hiểu cách hoạt động của từng mô-đun.</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button 
+              v-for="cat in commandCategories" 
+              :key="cat.id"
+              @click="selectedCategory = cat.id"
+              :class="selectedCategory === cat.id ? 'bg-brand-600 text-white' : 'text-slate-400 bg-slate-950 border border-slate-800'"
+              class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all">
+              {{ cat.name }} ({{ getCategoryCount(cat.id) }})
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div 
+            v-for="cmd in filteredCommands" 
+            :key="cmd.name"
+            class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-3 mb-2">
+                <span class="font-mono text-base font-bold text-brand-400 bg-slate-950 px-3 py-1 rounded-xl border border-slate-800">
+                  {{ cmd.name }}
+                </span>
+                <button 
+                  @click="copyCommand(cmd.syntax)"
+                  class="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 hover:text-white flex items-center gap-1">
+                  <span v-if="copiedCommand === cmd.syntax" class="text-emerald-400 font-bold">✓ Đã chép</span>
+                  <span v-else>📋 Chép</span>
+                </button>
+              </div>
+
+              <div class="text-xs text-slate-300 mb-3">{{ cmd.description }}</div>
+              
+              <div class="bg-slate-950 p-2 rounded-xl font-mono text-xs text-brand-300 border border-slate-800/80 mb-3">
+                {{ cmd.syntax }}
+              </div>
+            </div>
+
+            <div class="text-[11px] text-slate-400 pt-3 border-t border-slate-800 flex items-start gap-1.5">
+              <span>⚡</span>
+              <span>{{ cmd.highlights }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- FOOTER (Shared)                                                       -->
+    <!-- ===================================================================== -->
+    <footer class="mt-auto border-t border-slate-900 bg-slate-950 py-8">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div>
+          © 2026 <b>ThienHN</b> • Dev Assistant Bot & Multi-Target Cloud Orchestrator.
+        </div>
+        <div class="flex items-center gap-4">
+          <a href="https://thienhn.io.vn/" target="_blank" class="hover:text-slate-300 transition-colors">Portfolio</a>
+          <a href="https://thienhn.io.vn/projects" target="_blank" class="hover:text-slate-300 transition-colors">Projects</a>
+          <a href="https://github.com/ThienHN0910/assistant-bot" target="_blank" class="hover:text-slate-300 transition-colors">GitHub</a>
+        </div>
+      </div>
+    </footer>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: GOOGLE OAUTH LOGIN MODAL                                     -->
+    <!-- ===================================================================== -->
+    <div v-show="showLoginModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+      <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center relative">
+        <button 
+          @click="showLoginModal = false" 
+          class="absolute top-5 right-5 text-slate-400 hover:text-white p-2 rounded-xl bg-slate-950 border border-slate-800">
+          ✕
+        </button>
+
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600/20 to-brand-500/10 text-brand-400 mb-5 border border-brand-500/20 shadow-inner">
+          <svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+
+        <h3 class="text-2xl font-extrabold mb-1.5 text-white">Đăng Nhập Quản Trị</h3>
+        <p class="text-slate-400 text-xs mb-6 leading-relaxed">
+          Xác thực Google OAuth 2.0. Chỉ tài khoản quản trị viên được chỉ định mới có quyền vào Dashboard.
+        </p>
+
+        <!-- Loading State -->
+        <div v-if="loadingAuth" class="py-6 flex flex-col items-center justify-center gap-3">
+          <div class="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+          <span class="text-sm text-slate-400 font-medium">Đang xác thực tài khoản Google...</span>
+        </div>
+
+        <!-- Google Sign-In Container -->
+        <div v-show="!loadingAuth" class="flex flex-col items-center justify-center py-2">
+          <div id="google-btn-container" class="min-h-[44px] flex justify-center"></div>
+
+          <div v-if="!googleClientId" class="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs text-left">
+            ⚠️ <b>Chưa cấu hình GOOGLE_CLIENT_ID:</b><br/>
+            Vui lòng điền <code>GOOGLE_CLIENT_ID</code> trong file <code>.env</code> theo hướng dẫn trong <code>.env.example</code>.
+          </div>
+        </div>
+
+        <!-- Auth Error Alert -->
+        <div v-if="authError" class="mt-4 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+          <span>⚠️</span>
+          <span>{{ authError }}</span>
+        </div>
+      </div>
     </div>
 
-    <!-- 3. DEPLOY MODAL (GitHub Integration) -->
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: GITHUB DEPLOY MODAL                                          -->
+    <!-- ===================================================================== -->
     <div v-if="showDeployModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl relative">
         <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
-          <div class="flex items-center gap-2.5">
-            <span class="text-2xl">🚀</span>
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">🐙</span>
             <h3 class="text-lg font-bold text-white">Triển Khai Dự Án Từ GitHub</h3>
           </div>
-          <button @click="closeDeployModal" class="text-slate-400 hover:text-white text-xl p-1">✕</button>
+          <button @click="closeDeployModal" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
         </div>
 
         <div class="space-y-4">
-          <!-- Step 1: Input GitHub URL -->
           <div>
-            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">GitHub Public Repo URL</label>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">GitHub Public Repo URL</label>
             <div class="flex gap-2">
               <input 
                 type="text" 
                 v-model="newDeploy.repoUrl" 
+                placeholder="https://github.com/owner/repo" 
+                class="flex-grow px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-brand-500 text-white"
                 @keyup.enter="inspectRepo"
-                placeholder="https://github.com/owner/repository"
-                class="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-brand-500 text-white"
               />
               <button 
                 @click="inspectRepo" 
                 :disabled="inspectingRepo || !newDeploy.repoUrl"
-                class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-medium rounded-xl text-sm transition-all flex items-center gap-2">
                 <span v-if="inspectingRepo" class="animate-spin">⏳</span>
-                <span v-else>🔍</span>
-                Phân tích
+                <span v-else>🔍 Phân tích</span>
               </button>
             </div>
           </div>
 
-          <!-- Inspection Error -->
           <div v-if="newDeploy.inspectError" class="p-3.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
             <span>⚠️</span>
             <span>{{ newDeploy.inspectError }}</span>
           </div>
 
-          <!-- Inspection Result -->
-          <div v-if="newDeploy.inspection" class="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Kết quả nhận diện:</span>
-              <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/20 text-brand-300 border border-brand-500/30">
-                {{ newDeploy.inspection.title }}
-              </span>
-            </div>
-            <p class="text-xs text-slate-300">{{ newDeploy.inspection.description || newDeploy.inspection.summary }}</p>
-
-            <!-- Monorepo breakdown -->
-            <div v-if="(newDeploy.inspection.category || newDeploy.inspection.type) === 'monorepo'" class="text-xs space-y-1 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-slate-300">
-              <div>🎨 <b>Frontend:</b> {{ newDeploy.inspection.frontendPath }} ({{ newDeploy.inspection.frontendFramework }})</div>
-              <div>⚙️ <b>Backend:</b> {{ newDeploy.inspection.backendPath }} ({{ newDeploy.inspection.backendFramework }})</div>
+          <div v-if="newDeploy.inspection" class="space-y-4 pt-2">
+            <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-slate-400">Kết quả nhận diện:</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300">
+                  {{ newDeploy.inspection.label || newDeploy.inspection.type }}
+                </span>
+              </div>
+              <div class="text-xs text-slate-300">{{ newDeploy.inspection.description }}</div>
             </div>
 
-            <!-- Target Selection -->
             <div>
-              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Chọn nền tảng triển khai</label>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <label 
-                  v-for="target in (newDeploy.inspection.supportedTargets || newDeploy.inspection.targets || [])" 
-                  :key="target" 
-                  class="flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all"
-                  :class="newDeploy.target === target ? 'bg-brand-600/10 border-brand-500 text-brand-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'">
-                  <input type="radio" :value="target" v-model="newDeploy.target" class="accent-brand-500" />
-                  <span class="text-xs font-semibold">
-                    {{ target === 'vps' ? '💻 VPS Nginx (Trực tiếp)' : (target === 'vercel' ? '▲ Vercel Cloud' : (target === 'render' ? '🔷 Render Web' : '🚀 Deploy Cả Hai (FE + BE)')) }}
-                  </span>
-                </label>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Chọn nền tảng triển khai</label>
+              <div class="grid grid-cols-2 gap-3" v-if="newDeploy.inspection.type === 'monorepo'">
+                <button 
+                  type="button"
+                  @click="newDeploy.target = 'both'"
+                  :class="newDeploy.target === 'both' ? 'border-brand-500 bg-brand-500/10 text-brand-300' : 'border-slate-800 bg-slate-950 text-slate-400'"
+                  class="p-3 border rounded-xl text-xs font-semibold text-center transition-all">
+                  ▲ Frontend -> Vercel<br/>🔷 Backend -> Render
+                </button>
+                <button 
+                  type="button"
+                  @click="newDeploy.target = 'vercel'"
+                  :class="newDeploy.target === 'vercel' ? 'border-brand-500 bg-brand-500/10 text-brand-300' : 'border-slate-800 bg-slate-950 text-slate-400'"
+                  class="p-3 border rounded-xl text-xs font-semibold text-center transition-all">
+                  ▲ Chỉ Frontend (Vercel)
+                </button>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3" v-else>
+                <button 
+                  type="button"
+                  v-if="newDeploy.inspection.type === 'static_pure'"
+                  @click="newDeploy.target = 'vps'"
+                  :class="newDeploy.target === 'vps' ? 'border-brand-500 bg-brand-500/10 text-brand-300' : 'border-slate-800 bg-slate-950 text-slate-400'"
+                  class="p-3 border rounded-xl text-xs font-semibold text-center transition-all">
+                  💻 VPS Nginx (Trực tiếp)
+                </button>
+
+                <button 
+                  type="button"
+                  @click="newDeploy.target = 'vercel'"
+                  :class="newDeploy.target === 'vercel' ? 'border-brand-500 bg-brand-500/10 text-brand-300' : 'border-slate-800 bg-slate-950 text-slate-400'"
+                  class="p-3 border rounded-xl text-xs font-semibold text-center transition-all">
+                  ▲ Vercel Cloud
+                </button>
               </div>
             </div>
 
-            <!-- Subdomain Config -->
             <div>
-              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Tên miền phụ (Subdomain)</label>
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tên miền phụ (Subdomain)</label>
               <div class="flex items-center">
                 <input 
                   type="text" 
                   v-model="newDeploy.subdomain" 
-                  class="w-48 px-3 py-2 bg-slate-950 border border-slate-700 rounded-l-xl text-sm font-mono text-white focus:outline-none focus:border-brand-500"
+                  class="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-l-xl text-sm focus:outline-none focus:border-brand-500 text-white font-mono"
                 />
-                <span class="px-3 py-2 bg-slate-800 border border-l-0 border-slate-700 rounded-r-xl text-sm font-mono text-slate-400">
+                <span class="px-4 py-2.5 bg-slate-800 border border-l-0 border-slate-700 rounded-r-xl text-sm text-slate-400 font-mono">
                   .{{ newDeploy.baseDomain || 'thienhn.io.vn' }}
                 </span>
               </div>
-              <p class="text-[11px] text-slate-500 mt-1">
-                {{ newDeploy.target === 'vps' ? '☁️ Cloudflare DNS: Bản ghi A trỏ về IP của VPS' : (newDeploy.target === 'vercel' ? '☁️ Cloudflare DNS: Bản ghi CNAME trỏ về cname.vercel-dns.com' : (newDeploy.target === 'render' ? '☁️ Cloudflare DNS: Bản ghi CNAME trỏ về Render' : '☁️ Cloudflare DNS: Tự động trỏ tên miền cho cả FE và BE')) }}
-              </p>
+              <div class="text-[11px] text-slate-500 mt-1">
+                ☁️ Cloudflare DNS: Bản ghi {{ newDeploy.target === 'vps' ? 'A trỏ về IP của VPS' : 'CNAME trỏ về cname.vercel-dns.com' }}
+              </div>
             </div>
           </div>
 
-          <!-- Deploy Error -->
           <div v-if="newDeploy.deployError" class="p-3.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
             <span>⚠️</span>
             <span>{{ newDeploy.deployError }}</span>
           </div>
 
-          <!-- Modal Action Buttons -->
           <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
             <button 
+              type="button" 
               @click="closeDeployModal" 
               class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-medium transition-all">
               Đóng
             </button>
             <button 
-              @click="executeDeploy" 
+              type="button" 
+              @click="executeDeploy"
               :disabled="deploying || !newDeploy.inspection || !newDeploy.target || !newDeploy.subdomain"
-              class="px-5 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2">
+              class="px-5 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2">
               <span v-if="deploying" class="animate-spin">⏳</span>
-              <span v-else>🚀</span>
-              Triển khai ngay
+              <span v-else>🚀 Bắt đầu Deploy</span>
             </button>
           </div>
         </div>
@@ -415,16 +1059,17 @@
     <!-- TOAST NOTIFICATION -->
     <div 
       v-if="toast.show" 
-      class="fixed bottom-6 right-6 px-5 py-3 rounded-2xl shadow-2xl text-sm font-medium flex items-center gap-3 transition-all transform z-50"
-      :class="toast.type === 'error' ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'">
+      class="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl border text-sm font-medium flex items-center gap-3 transition-all"
+      :class="toast.type === 'error' ? 'bg-rose-950/90 border-rose-500/50 text-rose-200' : 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'">
       <span>{{ toast.type === 'error' ? '❌' : '✅' }}</span>
       <span>{{ toast.message }}</span>
     </div>
+
   </div>
 
-  <!-- VUE APPLICATION LOGIC -->
+  <!-- VUE 3 APPLICATION SCRIPT -->
   <script>
-    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+    const { createApp, ref, computed, onMounted } = Vue;
 
     createApp({
       setup() {
@@ -434,20 +1079,298 @@
         const googleClientId = ref('');
         const authError = ref('');
         const loadingAuth = ref(false);
-        
+        const showLoginModal = ref(false);
+
+        // Navigation state: 'showcase' (Guest Landing Page) or 'dashboard' (Management Console)
+        const currentTab = ref('showcase');
+        const dashTab = ref('telemetry'); // 'telemetry' | 'deployments' | 'commands'
+
+        // Dashboard Data
         const system = ref(null);
         const deployments = ref([]);
         const refreshing = ref(false);
         const targetFilter = ref('all');
         const searchQuery = ref('');
 
+        // Toast feedback
         const toast = ref({ show: false, message: '', type: 'success' });
-
         function showToast(message, type = 'success') {
           toast.value = { show: true, message, type };
           setTimeout(() => { toast.value.show = false; }, 4000);
         }
 
+        // Copy feedback
+        const copiedCommand = ref('');
+        function copyCommand(text) {
+          navigator.clipboard.writeText(text);
+          copiedCommand.value = text;
+          showToast(`Đã sao chép lệnh: ${text}`);
+          setTimeout(() => { copiedCommand.value = ''; }, 2500);
+        }
+
+        // =====================================================================
+        // TELEGRAM COMMANDS CATALOG (16 Commands)
+        // =====================================================================
+        const commandCategories = [
+          { id: 'all', name: 'Tất cả' },
+          { id: 'vps', name: '🖥️ Quản trị VPS' },
+          { id: 'deploy', name: '🚀 Triển khai Web' },
+          { id: 'perf', name: '⚡ Hiệu năng' },
+          { id: 'system', name: '⚙️ Hệ thống' },
+        ];
+
+        const selectedCategory = ref('all');
+        const commandSearch = ref('');
+
+        const commands = ref([
+          {
+            name: '/status',
+            category: 'vps',
+            badge: 'Giám sát VPS',
+            badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+            description: 'Báo cáo thời gian thực về tài nguyên máy chủ: CPU (%), RAM (dùng/tổng), SWAP, Load Average và dung lượng đĩa trống.',
+            syntax: '/status',
+            sampleOutput: `📊 THÔNG TIN HỆ THỐNG
+• OS: Linux (Ubuntu 22.04 LTS)
+• Uptime: 18 ngày 4 giờ
+• CPU Load: 2.8%
+• RAM: 245 MB / 980 MB (25%)
+• SWAP: 110 MB / 1024 MB
+• Disk: 8.4 GB / 30 GB (28%)`,
+            highlights: 'Đo lường trực tiếp qua /proc và os-utils, tiêu thụ 0MB RAM phụ trợ.',
+            showPreview: false,
+          },
+          {
+            name: '/deploy',
+            category: 'deploy',
+            badge: 'Triển khai Web',
+            badgeColor: 'bg-brand-500/10 text-brand-400 border-brand-500/20',
+            description: 'Triển khai web tương tác 1 chạm: tự động quét file .zip trong thư mục upload hoặc tự bắt link GitHub. Hiển thị inline buttons chọn nền tảng.',
+            syntax: '/deploy [file.zip] [vps|vercel]',
+            sampleOutput: `🚀 DANH SÁCH FILE ZIP SẴN SÀNG DEPLOY
+📦 portfolio.zip (1.2 MB)
+📦 vue-dashboard.zip (450 KB)
+
+[🖥️ VPS Nginx]  [▲ Vercel Cloud]`,
+            highlights: 'Tự động cấu hình Nginx SSL hoặc Vercel Edge, đồng thời tạo bản ghi DNS Cloudflare tự động.',
+            showPreview: false,
+          },
+          {
+            name: '/perf',
+            category: 'perf',
+            badge: 'Hiệu năng',
+            badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+            description: 'Đo độ trễ mạng tại chỗ qua curl -w (DNS Lookup, TCP Connect, TTFB, Total Duration) với 0MB RAM, kết hợp chấm điểm Google PageSpeed Insights Mobile từ xa.',
+            syntax: '/perf <project | domain | url>',
+            sampleOutput: `⚡ KẾT QUẢ ĐO HIỆU NĂNG: portfolio.thienhn.io.vn
+• DNS Lookup: 12ms
+• TCP Connect: 24ms
+• TTFB: 85ms
+• Total Time: 135ms
+🚀 Google PageSpeed Score: 98/100 (Mobile)`,
+            highlights: 'Phân rã chi tiết TTFB và gọi Google API không tốn 1MB RAM nào của VPS.',
+            showPreview: false,
+          },
+          {
+            name: '/ps',
+            category: 'vps',
+            badge: 'Giám sát VPS',
+            badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+            description: 'Liệt kê Top 5 tiến trình đang tiêu thụ nhiều RAM và CPU nhất trên máy chủ. Giúp chẩn đoán ngay lập tức tiến trình gây nghẽn hoặc có nguy cơ OOM.',
+            syntax: '/ps',
+            sampleOutput: `🔥 TOP 5 TIẾN TRÌNH NGỐN TÀI NGUYÊN
+1. node (PM2 assistant-bot) - 45.2 MB (4.6%) - CPU 0.8%
+2. nginx: worker process - 18.4 MB (1.9%) - CPU 0.1%
+3. systemd-resolved - 12.1 MB (1.2%) - CPU 0.0%
+4. pm2 God Daemon - 32.0 MB (3.3%) - CPU 0.2%
+5. sshd: hnt - 8.5 MB (0.9%) - CPU 0.0%`,
+            highlights: 'Đọc bảng tiến trình qua ps aux có sanitize an toàn.',
+            showPreview: false,
+          },
+          {
+            name: '/logs',
+            category: 'system',
+            badge: 'Hệ thống',
+            badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+            description: 'Đọc 20 dòng log lỗi PM2 gần nhất bằng cơ chế đọc ngược từ cuối file (OOM-Safe Tail). Miễn nhiễm OOM ngay cả khi file log nặng hàng gigabyte.',
+            syntax: '/logs [số dòng]',
+            sampleOutput: `📋 20 DÒNG LOG LỖI GẦN NHẤT
+[2026-09-25 15:40:12] [PM2] App [assistant-bot:0] online
+[2026-09-25 15:40:14] Dashboard API listening on localhost:3001
+[2026-09-25 15:40:15] Bot Telegram polling started successfully`,
+            highlights: 'Cơ chế readLastLines đọc buffer byte từ cuối file, tiêu thụ chính xác 0 MB RAM.',
+            showPreview: false,
+          },
+          {
+            name: '/update',
+            category: 'system',
+            badge: 'Hệ thống',
+            badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+            description: 'Tự động cập nhật mã nguồn bot từ nhánh main của GitHub, tự động chạy npm install nếu dependencies đổi, kiểm tra cú pháp và khởi động lại PM2 với trần 200MB RAM.',
+            syntax: '/update',
+            sampleOutput: `🔄 ĐANG CẬP NHẬT MÃ NGUỒN BOT...
+• Git Pull: Thành công (2 commit mới)
+• Kiểm tra cú pháp: Hoàn tất 0 lỗi
+• PM2 Restart: Đã kích hoạt với trần 200MB RAM!`,
+            highlights: 'Tự động lên lịch hẹn giờ 1.5s gửi phản hồi trước khi reload PM2 an toàn.',
+            showPreview: false,
+          },
+          {
+            name: '/restart',
+            category: 'system',
+            badge: 'Hệ thống',
+            badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+            description: 'Khởi động lại bot từ xa an toàn qua PM2 kèm tham số --update-env và trần bộ nhớ --max-memory-restart 200M.',
+            syntax: '/restart',
+            sampleOutput: `🔄 Đang khởi động lại tiến trình "assistant-bot"...
+Vui lòng đợi vài giây để bot kết nối lại Telegram.`,
+            highlights: 'Đảm bảo cờ trần RAM 200MB luôn được duy trì sau mỗi lần restart.',
+            showPreview: false,
+          },
+          {
+            name: '/web_list',
+            category: 'deploy',
+            badge: 'Triển khai Web',
+            badgeColor: 'bg-brand-500/10 text-brand-400 border-brand-500/20',
+            description: 'Liệt kê danh sách tất cả các ứng dụng web và API đang hoạt động (trên VPS Nginx, Vercel Cloud hoặc Render), bao gồm URL HTTPS và dung lượng.',
+            syntax: '/web_list',
+            sampleOutput: `🌐 DANH SÁCH DỰ ÁN ĐANG CHẠY (VPS & CLOUD)
+
+1. portfolio [Web Tĩnh] [VPS]
+   • URL: https://portfolio.thienhn.io.vn
+   • Dung lượng: 4.2 MB
+   • Deploy: 25/09/2026
+   • Thao tác nhanh: /perf portfolio | /web_remove portfolio`,
+            highlights: 'Đồng bộ trực tiếp giữa thư mục VPS và Deployment Registry.',
+            showPreview: false,
+          },
+          {
+            name: '/web_remove',
+            category: 'deploy',
+            badge: 'Triển khai Web',
+            badgeColor: 'bg-brand-500/10 text-brand-400 border-brand-500/20',
+            description: 'Gỡ bỏ hoàn toàn một ứng dụng đã triển khai: xóa thư mục mã nguồn trên VPS, dừng tiến trình PM2 (nếu là backend), xóa Nginx config và tự động thu hồi bản ghi DNS Cloudflare.',
+            syntax: '/web_remove <tên_dự_án>',
+            sampleOutput: `🗑️ ĐÃ GỠ BỎ THÀNH CÔNG DỰ ÁN: "portfolio"
+• Thư mục mã nguồn: Đã dọn dẹp
+• Cấu hình Nginx: Đã xóa và reload
+• Cloudflare DNS: Đã thu hồi bản ghi A (portfolio.thienhn.io.vn)`,
+            highlights: 'Dọn dẹp triệt để không để lại rác tài nguyên hay xung đột DNS.',
+            showPreview: false,
+          },
+          {
+            name: '/cleancache',
+            category: 'vps',
+            badge: 'Giám sát VPS',
+            badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+            description: 'Xả sạch bộ nhớ đệm trang (PageCache, Dentries, Inodes) của hệ điều hành Linux và xóa sạch lịch sử log cũ của PM2 (pm2 flush).',
+            syntax: '/cleancache',
+            sampleOutput: `🧹 DỌN DẸP BỘ NHỚ HOÀN TẤT
+• Đã xóa sạch log cũ PM2 (pm2 flush)
+• Đã giải phóng 180 MB RAM PageCache
+• Bộ nhớ khả dụng hiện tại: 785 MB`,
+            highlights: 'Dùng lệnh echo 3 > /proc/sys/vm/drop_caches an toàn.',
+            showPreview: false,
+          },
+          {
+            name: '/uptime',
+            category: 'vps',
+            badge: 'Giám sát VPS',
+            badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+            description: 'Hiển thị thời gian hoạt động liên tục của máy chủ VPS và thời điểm boot server gần nhất.',
+            syntax: '/uptime',
+            sampleOutput: `⏱️ THỜI GIAN HOẠT ĐỘNG
+• Thời gian chạy: 18 ngày 4 giờ 22 phút
+• Thời điểm boot: 07/09/2026 12:00:00`,
+            highlights: 'Truy vấn trực tiếp từ /proc/uptime.',
+            showPreview: false,
+          },
+          {
+            name: '/ip',
+            category: 'vps',
+            badge: 'Giám sát VPS',
+            badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+            description: 'Lấy địa chỉ IPv4 Public của máy chủ VPS phục vụ đối chiếu và cấu hình DNS.',
+            syntax: '/ip',
+            sampleOutput: `🌐 IP PUBLIC CỦA MÁY CHỦ:
+34.124.xxx.xxx (Google Cloud Asia-Southeast1)`,
+            highlights: 'Tự động kiểm tra qua ipify và ifconfig.me có cơ chế fallback.',
+            showPreview: false,
+          },
+          {
+            name: '/deploy_web',
+            category: 'deploy',
+            badge: 'Triển khai Web',
+            badgeColor: 'bg-brand-500/10 text-brand-400 border-brand-500/20',
+            description: 'Lệnh alias triển khai nhanh file ZIP trực tiếp lên VPS Nginx.',
+            syntax: '/deploy_web <tên_app> <file.zip>',
+            sampleOutput: `🚀 Đang triển khai dự án "landing" lên VPS...
+• Nền tảng: VPS (Nginx)
+• Domain: landing.thienhn.io.vn`,
+            highlights: 'Hỗ trợ triển khai nhanh khi đã biết rõ tên file.',
+            showPreview: false,
+          },
+          {
+            name: '/notes',
+            category: 'system',
+            badge: 'Hệ thống',
+            badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+            description: 'Xem 10 ghi chú nhanh gần nhất đã lưu (gửi tin nhắn text thường bất kỳ không bắt đầu bằng / để lưu vào notes.txt), hoặc dùng /notes clear để dọn sạch.',
+            syntax: '/notes [clear]',
+            sampleOutput: `📝 DANH SÁCH GHI CHÚ GẦN NHẤT
+1. [25/09 14:10] Nhớ test lại Google OAuth trên Dashboard
+2. [25/09 15:20] Cấu hình CNAME Vercel cho subdomain test`,
+            highlights: 'Gửi text thường bất kỳ để tự động ghi chú kèm mốc thời gian Asia/Ho_Chi_Minh.',
+            showPreview: false,
+          },
+          {
+            name: '/sh',
+            category: 'system',
+            badge: 'Hệ thống',
+            badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+            description: 'Thực thi các lệnh shell hệ thống an toàn theo danh mục whitelist nghiêm ngặt (chặn command injection, giới hạn timeout và buffer).',
+            syntax: '/sh <lệnh trong whitelist>',
+            sampleOutput: `💻 KẾT QUẢ THỰC THI SHELL: "df -h"
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root        30G  8.4G   21G  29% /`,
+            highlights: 'Chặn đứng mọi nguy cơ injection và kiểm soát quyền thực thi tuyệt đối.',
+            showPreview: false,
+          },
+          {
+            name: '/start',
+            category: 'system',
+            badge: 'Hệ thống',
+            badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+            description: 'Hiển thị menu chào mừng, hướng dẫn chi tiết các nhóm lệnh và kích hoạt reply keyboard tiện ích.',
+            syntax: '/start',
+            sampleOutput: `👋 Chào mừng đến với Dev Assistant Bot!
+🤖 Bot trợ lý cá nhân dành cho lập trình viên!
+Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
+            highlights: 'Điểm bắt đầu thân thiện cho người dùng trên Telegram.',
+            showPreview: false,
+          }
+        ]);
+
+        function getCategoryCount(catId) {
+          if (catId === 'all') return commands.value.length;
+          return commands.value.filter(c => c.category === catId).length;
+        }
+
+        const filteredCommands = computed(() => {
+          return commands.value.filter(cmd => {
+            const matchesCat = selectedCategory.value === 'all' || cmd.category === selectedCategory.value;
+            const query = commandSearch.value.toLowerCase().trim();
+            const matchesSearch = !query || 
+              cmd.name.toLowerCase().includes(query) || 
+              cmd.description.toLowerCase().includes(query) || 
+              cmd.syntax.toLowerCase().includes(query);
+            return matchesCat && matchesSearch;
+          });
+        });
+
+        // =====================================================================
+        // API REQUEST HELPER
+        // =====================================================================
         async function apiRequest(path, options = {}) {
           const headers = {
             'Content-Type': 'application/json',
@@ -475,6 +1398,15 @@
           return data;
         }
 
+        // =====================================================================
+        // AUTHENTICATION (Google OAuth 2.0 GIS)
+        // =====================================================================
+        function openLoginModal() {
+          showLoginModal.value = true;
+          authError.value = '';
+          initGoogleAuth();
+        }
+
         async function initGoogleAuth() {
           try {
             const res = await fetch('/api/auth/config');
@@ -482,25 +1414,23 @@
             if (data.ok && data.googleClientId) {
               googleClientId.value = data.googleClientId;
 
-              // Check if Google script is loaded
               const checkGsi = setInterval(() => {
-                if (window.google?.accounts?.id) {
+                const btnContainer = document.getElementById('google-btn-container');
+                if (window.google?.accounts?.id && btnContainer) {
                   clearInterval(checkGsi);
                   google.accounts.id.initialize({
                     client_id: data.googleClientId,
                     callback: handleGoogleCredentialResponse,
                     auto_select: false,
                   });
-                  google.accounts.id.renderButton(
-                    document.getElementById('google-btn-container'),
-                    {
-                      theme: 'outline',
-                      size: 'large',
-                      width: '280',
-                      text: 'signin_with',
-                      shape: 'pill',
-                    }
-                  );
+                  btnContainer.innerHTML = '';
+                  google.accounts.id.renderButton(btnContainer, {
+                    theme: 'outline',
+                    size: 'large',
+                    width: '280',
+                    text: 'signin_with',
+                    shape: 'pill',
+                  });
                 }
               }, 100);
             }
@@ -527,6 +1457,9 @@
               localStorage.setItem('dashboard_session', data.token);
               localStorage.setItem('dashboard_user', JSON.stringify(data.user));
               isAuthenticated.value = true;
+              showLoginModal.value = false;
+              currentTab.value = 'dashboard';
+              showToast(`Chào mừng trở lại, ${data.user.name}!`);
               fetchData();
             } else {
               authError.value = data.error || 'Đăng nhập Google thất bại';
@@ -547,9 +1480,7 @@
           try {
             const res = await fetch('/api/auth/verify', {
               method: 'POST',
-              headers: {
-                Authorization: `Bearer ${token.value}`,
-              },
+              headers: { Authorization: `Bearer ${token.value}` },
             });
             const data = await res.json();
             if (data.ok && data.authenticated) {
@@ -570,31 +1501,34 @@
           localStorage.removeItem('dashboard_session');
           localStorage.removeItem('dashboard_user');
           isAuthenticated.value = false;
-          nextTick(() => {
-            initGoogleAuth();
-          });
+          currentTab.value = 'showcase';
+          showToast('Đã đăng xuất khỏi Dashboard.');
+          initGoogleAuth();
         }
 
+        // =====================================================================
+        // DASHBOARD DATA FETCHING
+        // =====================================================================
         async function fetchData() {
           if (!isAuthenticated.value) return;
           refreshing.value = true;
           try {
-            const [statusRes, depRes] = await Promise.all([
+            const [sysRes, depRes] = await Promise.all([
               apiRequest('/api/status').catch(() => null),
               apiRequest('/api/deployments').catch(() => null)
             ]);
 
-            if (statusRes?.ok) system.value = statusRes.system;
+            if (sysRes?.ok) system.value = sysRes.system;
             if (depRes?.ok) deployments.value = depRes.deployments;
           } catch (err) {
-            console.error('Lỗi nạp dữ liệu dashboard:', err);
+            showToast(err.message, 'error');
           } finally {
             refreshing.value = false;
           }
         }
 
         async function confirmUndeploy(name) {
-          if (!confirm(`Bạn có chắc chắn muốn xóa dự án "${name}" không? Thao tác này sẽ giải phóng tên miền và tài nguyên.`)) {
+          if (!confirm(`Bạn có chắc chắn muốn xóa dự án "${name}" không? Thao tác này sẽ giải phóng tài nguyên và thu hồi bản ghi DNS Cloudflare.`)) {
             return;
           }
 
@@ -615,16 +1549,19 @@
           }
         }
 
-        // Deploy Modal State & Logic
+        // =====================================================================
+        // DEPLOY MODAL LOGIC (GitHub Inspector & Deploy)
+        // =====================================================================
         const showDeployModal = ref(false);
         const inspectingRepo = ref(false);
         const deploying = ref(false);
+
         const newDeploy = ref({
           repoUrl: '',
-          inspection: null,
-          target: '',
+          target: 'vps',
           subdomain: '',
           baseDomain: 'thienhn.io.vn',
+          inspection: null,
           inspectError: '',
           deployError: '',
         });
@@ -632,10 +1569,10 @@
         function openDeployModal() {
           newDeploy.value = {
             repoUrl: '',
-            inspection: null,
-            target: '',
+            target: 'vps',
             subdomain: '',
             baseDomain: 'thienhn.io.vn',
+            inspection: null,
             inspectError: '',
             deployError: '',
           };
@@ -660,7 +1597,7 @@
 
             if (res.ok) {
               newDeploy.value.inspection = res.inspection;
-              newDeploy.value.target = res.inspection.suggestedTarget || res.inspection.defaultTarget || res.inspection.supportedTargets?.[0] || res.inspection.targets?.[0] || 'vps';
+              newDeploy.value.target = res.inspection.suggestedTarget || res.inspection.defaultTarget || res.inspection.supportedTargets?.[0] || 'vps';
               newDeploy.value.subdomain = res.suggestedSubdomain || res.inspection.repo;
               newDeploy.value.baseDomain = res.baseDomain || 'thienhn.io.vn';
             } else {
@@ -731,18 +1668,25 @@
 
         const filteredDeployments = computed(() => {
           return deployments.value.filter((d) => {
-            const matchTarget = targetFilter.value === 'all' || d.target === targetFilter.value;
-            const matchSearch = !searchQuery.value || 
-              d.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+            const matchesTarget = targetFilter.value === 'all' || d.target === targetFilter.value;
+            const matchesSearch = !searchQuery.value || 
+              (d.name && d.name.toLowerCase().includes(searchQuery.value.toLowerCase())) ||
               (d.domain && d.domain.toLowerCase().includes(searchQuery.value.toLowerCase()));
-            return matchTarget && matchSearch;
+            return matchesTarget && matchesSearch;
           });
         });
 
         function formatDate(isoStr) {
           if (!isoStr) return 'N/A';
           try {
-            return new Date(isoStr).toLocaleString('vi-VN');
+            const d = new Date(isoStr);
+            return d.toLocaleString('vi-VN', { 
+              hour: '2-digit', 
+              minute: '2-digit', 
+              day: '2-digit', 
+              month: '2-digit', 
+              year: 'numeric' 
+            });
           } catch {
             return isoStr;
           }
@@ -750,11 +1694,7 @@
 
         onMounted(() => {
           verifySession();
-          setInterval(() => {
-            if (isAuthenticated.value) {
-              fetchData();
-            }
-          }, 15000); // Polling 15s
+          initGoogleAuth();
         });
 
         return {
@@ -764,17 +1704,27 @@
           googleClientId,
           authError,
           loadingAuth,
+          showLoginModal,
+          openLoginModal,
+          currentTab,
+          dashTab,
           system,
           deployments,
           refreshing,
           targetFilter,
           searchQuery,
           toast,
-          filteredDeployments,
-          logout,
+          showToast,
+          copiedCommand,
+          copyCommand,
+          commandCategories,
+          selectedCategory,
+          commandSearch,
+          commands,
+          getCategoryCount,
+          filteredCommands,
           fetchData,
           confirmUndeploy,
-          formatDate,
           showDeployModal,
           inspectingRepo,
           deploying,
@@ -783,6 +1733,9 @@
           closeDeployModal,
           inspectRepo,
           executeDeploy,
+          filteredDeployments,
+          formatDate,
+          logout,
         };
       }
     }).mount('#app');
