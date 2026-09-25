@@ -65,6 +65,51 @@ async function handleGitDeploy(ctx, deployId, target, config) {
       return;
     }
 
+    if (target === 'both') {
+      const feSub = pending.subdomain;
+      const beSub = `api-${pending.subdomain}`;
+      const baseDomain = config.baseDomain || 'thienhn.io.vn';
+
+      await ctx.replyWithHTML(
+        `⚙️ <b>Đang triển khai Monorepo "${escapeHtml(pending.projectName)}"...</b>\n` +
+        `• Frontend: Vercel (<code>https://${escapeHtml(feSub)}.${baseDomain}</code>)\n` +
+        `• Backend: Render (<code>https://${escapeHtml(beSub)}.${baseDomain}</code>)\n` +
+        `<i>Đang tạo dịch vụ và cấu hình DNS Cloudflare...</i>`
+      );
+
+      const feRes = await deployer.deploy(
+        {
+          source: 'github_public',
+          repoUrl: pending.repoUrl,
+          projectName: pending.projectName,
+          target: 'vercel',
+          subdomain: feSub,
+        },
+        config
+      );
+
+      const beRes = await deployer.deploy(
+        {
+          source: 'github_public',
+          repoUrl: pending.repoUrl,
+          projectName: `api-${pending.projectName}`,
+          target: 'render',
+          subdomain: beSub,
+        },
+        config
+      );
+
+      deployStore.deletePending(deployId);
+
+      await ctx.replyWithHTML(
+        `🎉 <b>DEPLOY MONOREPO THÀNH CÔNG!</b>\n\n` +
+        `• Frontend (Vercel): <a href="${feRes.deployment.url}">${feRes.deployment.url}</a>\n` +
+        `• Backend (Render): <a href="${beRes.deployment.url}">${beRes.deployment.url}</a>\n\n` +
+        `<i>Cả 2 dịch vụ đã online và được cấp SSL đầy đủ!</i>`
+      );
+      return;
+    }
+
     await ctx.replyWithHTML(
       `⚙️ <b>Đang triển khai kho lưu trữ GitHub "${escapeHtml(pending.projectName)}"...</b>\n` +
       `• Nền tảng: <b>${escapeHtml(target.toUpperCase())}</b>\n` +

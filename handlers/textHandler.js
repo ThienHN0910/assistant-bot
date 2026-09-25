@@ -3,21 +3,40 @@ const deployer = require('../lib/deployer');
 const { escapeHtml } = require('../config/utils');
 const deployStore = require('../lib/deployStore');
 
+const repoInspector = require('../lib/repoInspector');
+
 const GITHUB_REPO_REGEX = /https?:\/\/github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)(\/)?/i;
 
-function buildGitDeployMessage(repoUrl, projectName, subdomain, baseDomain, validTargets, deployId) {
+function buildGitDeployMessage(repoUrl, projectName, subdomain, baseDomain, validTargets, deployId, inspection = null) {
   const expectedDomain = `${subdomain}.${baseDomain}`;
   const buttons = [];
-  const targetRow = [];
 
-  if (validTargets.includes('vercel')) {
-    targetRow.push({ text: `▲ Vercel (${subdomain})`, callback_data: `git_target:${deployId}:vercel` });
-  }
-  if (validTargets.includes('render')) {
-    targetRow.push({ text: `🔷 Render (${subdomain})`, callback_data: `git_target:${deployId}:render` });
-  }
-  if (targetRow.length > 0) {
-    buttons.push(targetRow);
+  if (inspection?.type === 'monorepo') {
+    const feTarget = inspection.frontend?.target || 'vercel';
+    const beTarget = inspection.backend?.target || 'render';
+    const targetRow = [];
+    if (validTargets.includes(feTarget)) {
+      targetRow.push({ text: `▲ Frontend -> Vercel (${subdomain})`, callback_data: `git_target:${deployId}:${feTarget}` });
+    }
+    if (validTargets.includes(beTarget)) {
+      targetRow.push({ text: `🔷 Backend -> Render (api-${subdomain})`, callback_data: `git_target:${deployId}:${beTarget}` });
+    }
+    if (targetRow.length > 0) buttons.push(targetRow);
+    if (validTargets.includes('both') || (validTargets.includes(feTarget) && validTargets.includes(beTarget))) {
+      buttons.push([{ text: `🚀 Deploy Cả Hai (FE + BE)`, callback_data: `git_target:${deployId}:both` }]);
+    }
+  } else {
+    const targetRow = [];
+    if (validTargets.includes('vps')) {
+      targetRow.push({ text: `🖥️ VPS (${subdomain})`, callback_data: `git_target:${deployId}:vps` });
+    }
+    if (validTargets.includes('vercel')) {
+      targetRow.push({ text: `▲ Vercel (${subdomain})`, callback_data: `git_target:${deployId}:vercel` });
+    }
+    if (validTargets.includes('render')) {
+      targetRow.push({ text: `🔷 Render (${subdomain})`, callback_data: `git_target:${deployId}:render` });
+    }
+    if (targetRow.length > 0) buttons.push(targetRow);
   }
 
   buttons.push([
@@ -25,18 +44,51 @@ function buildGitDeployMessage(repoUrl, projectName, subdomain, baseDomain, vali
     { text: '❌ Hủy', callback_data: `git_cancel:${deployId}` },
   ]);
 
+  let typeDescription = '';
+  if (inspection?.type === 'monorepo') {
+    typeDescription =
+      `• Cấu trúc: <b>📦 Monorepo</b>\n` +
+      `  ├─ Frontend (${inspection.frontend.dir}): ${escapeHtml(inspection.frontend.frameworks.join(', '))}\n` +
+      `  └─ Backend (${inspection.backend.dir}): ${escapeHtml(inspection.backend.frameworks.join(', '))}\n\n` +
+      `• Tên miền FE: <code>https://${escapeHtml(expectedDomain)}</code>\n` +
+      `• Tên miền BE: <code>https://api-${escapeHtml(expectedDomain)}</code>\n\n` +
+      `<i>💡 Tự động phân tách: Frontend chạy trên Vercel, Backend chạy trên Render.</i>\n\n`;
+  } else if (inspection?.type === 'static_pure') {
+    typeDescription =
+      `• Loại hình: <b>📄 Web tĩnh thuần (HTML/CSS/JS)</b>\n` +
+      `• Tên miền đề xuất: <code>https://${escapeHtml(expectedDomain)}</code>\n\n` +
+      `<i>💡 Dự án không cần build, hỗ trợ deploy trực tiếp lên VPS hoặc Vercel.</i>\n\n`;
+  } else if (inspection?.type === 'frontend_spa') {
+    typeDescription =
+      `• Công nghệ: <b>⚛️ ${escapeHtml(inspection.frameworks.join(', '))}</b>\n` +
+      `• Tên miền đề xuất: <code>https://${escapeHtml(expectedDomain)}</code>\n\n` +
+      `<i>☁️ Dự án Frontend sẽ được build và host trên Vercel (bảo toàn RAM cho VPS).</i>\n\n`;
+  } else if (inspection?.type === 'backend_api') {
+    typeDescription =
+      `• Công nghệ: <b>🔷 ${escapeHtml(inspection.frameworks.join(', '))}</b>\n` +
+      `• Tên miền đề xuất: <code>https://${escapeHtml(expectedDomain)}</code>\n\n` +
+      `<i>☁️ Dịch vụ Backend sẽ được triển khai trên Render.</i>\n\n`;
+  } else {
+    typeDescription =
+      `• Tên miền đề xuất: <code>https://${escapeHtml(expectedDomain)}</code>\n\n` +
+      `<i>⚠️ Mã nguồn GitHub công khai sẽ được deploy lên Vercel hoặc Render (không deploy lên VPS để tiết kiệm RAM).</i>\n\n`;
+  }
+
+  const headerTitle = inspection?.type === 'monorepo'
+    ? `🐙 <b>PHÁT HIỆN KHO LƯU TRỮ GITHUB (MONOREPO)</b>\n\n`
+    : `🐙 <b>PHÁT HIỆN KHO LƯU TRỮ GITHUB</b>\n\n`;
+
   const html =
-    `🐙 <b>PHÁT HIỆN KHO LƯU TRỮ GITHUB</b>\n\n` +
+    headerTitle +
     `• Repo: <code>${escapeHtml(repoUrl)}</code>\n` +
     `• Dự án: <b>${escapeHtml(projectName)}</b>\n` +
-    `• Tên miền đề xuất: <code>https://${escapeHtml(expectedDomain)}</code>\n\n` +
-    `<i>⚠️ Mã nguồn GitHub công khai sẽ được deploy lên Vercel hoặc Render (không deploy lên VPS để tiết kiệm RAM).</i>\n\n` +
+    typeDescription +
     `<b>Bấm 1-chạm để triển khai ngay hoặc tùy chỉnh subdomain:</b>`;
 
   return { html, buttons };
 }
 
-function createTextHandler(config) {
+function createTextHandler(config, deps = {}) {
   return async (ctx) => {
     try {
       const text = ctx.message?.text;
@@ -69,14 +121,16 @@ function createTextHandler(config) {
         deployStore.clearAwaitingSubdomain(userId);
 
         const baseDomain = config.baseDomain || 'thienhn.io.vn';
-        const validTargets = deployer.getValidTargetsForSource('github_public', config);
+        const repoType = pending.inspection?.type || null;
+        const validTargets = deployer.getValidTargetsForSource('github_public', config, repoType);
         const { html, buttons } = buildGitDeployMessage(
           pending.repoUrl,
           pending.projectName,
           resolvedSub,
           baseDomain,
           validTargets,
-          awaitingDeployId
+          awaitingDeployId,
+          pending.inspection
         );
 
         await ctx.replyWithHTML(`✅ <b>Đã cập nhật tên miền thành công!</b>\n\n${html}`, {
@@ -94,7 +148,17 @@ function createTextHandler(config) {
         const projectName = repoName.toLowerCase();
         const baseDomain = config.baseDomain || 'thienhn.io.vn';
 
-        const validTargets = deployer.getValidTargetsForSource('github_public', config);
+        const depInspector = deps.inspector || repoInspector;
+        let inspection = null;
+        try {
+          inspection = await depInspector.inspectRepo(repoUrl, { client: deps.client });
+        } catch {}
+
+        const repoType = inspection?.type || null;
+        let validTargets = deployer.getValidTargetsForSource('github_public', config, repoType);
+        if (inspection?.type === 'monorepo' && validTargets.includes('vercel') && validTargets.includes('render')) {
+          validTargets.push('both');
+        }
 
         if (validTargets.length === 0) {
           await ctx.replyWithHTML(
@@ -116,6 +180,7 @@ function createTextHandler(config) {
           repoUrl,
           projectName,
           subdomain: autoSubdomain,
+          inspection,
         });
 
         const { html, buttons } = buildGitDeployMessage(
@@ -124,7 +189,8 @@ function createTextHandler(config) {
           autoSubdomain,
           baseDomain,
           validTargets,
-          deployId
+          deployId,
+          inspection
         );
 
         await ctx.replyWithHTML(html, {

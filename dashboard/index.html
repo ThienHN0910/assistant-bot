@@ -106,6 +106,13 @@
           </div>
 
           <button 
+            @click="openDeployModal" 
+            class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2">
+            <span>🚀</span>
+            Triển khai mới
+          </button>
+
+          <button 
             @click="fetchData" 
             :disabled="refreshing" 
             class="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
@@ -210,6 +217,7 @@
                 <th class="px-6 py-4">Tên Dự Án</th>
                 <th class="px-6 py-4">Nền Tảng</th>
                 <th class="px-6 py-4">Tên Miền / Cổng</th>
+                <th class="px-6 py-4">Trỏ DNS (Cloudflare)</th>
                 <th class="px-6 py-4">Trạng Thái</th>
                 <th class="px-6 py-4">Ngày Triển Khai</th>
                 <th class="px-6 py-4 text-right">Thao Tác</th>
@@ -217,7 +225,7 @@
             </thead>
             <tbody class="divide-y divide-slate-800">
               <tr v-if="filteredDeployments.length === 0">
-                <td colspan="6" class="px-6 py-12 text-center text-slate-500">
+                <td colspan="7" class="px-6 py-12 text-center text-slate-500">
                   Chưa có dịch vụ nào phù hợp với bộ lọc tìm kiếm.
                 </td>
               </tr>
@@ -252,6 +260,13 @@
                   <div v-if="dep.port" class="text-[11px] text-slate-500 mt-0.5">Port nội bộ: :{{ dep.port }}</div>
                 </td>
 
+                <!-- DNS Target -->
+                <td class="px-6 py-4 font-mono text-xs">
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-950 text-slate-300 border border-slate-800">
+                    ☁️ {{ dep.dnsTarget || 'A Record -> VPS IP' }}
+                  </span>
+                </td>
+
                 <!-- Status -->
                 <td class="px-6 py-4">
                   <span class="inline-flex items-center gap-1 text-xs text-emerald-400">
@@ -277,6 +292,124 @@
           </table>
         </div>
       </section>
+    </div>
+
+    <!-- 3. DEPLOY MODAL (GitHub Integration) -->
+    <div v-if="showDeployModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+          <div class="flex items-center gap-2.5">
+            <span class="text-2xl">🚀</span>
+            <h3 class="text-lg font-bold text-white">Triển Khai Dự Án Từ GitHub</h3>
+          </div>
+          <button @click="closeDeployModal" class="text-slate-400 hover:text-white text-xl p-1">✕</button>
+        </div>
+
+        <div class="space-y-4">
+          <!-- Step 1: Input GitHub URL -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">GitHub Public Repo URL</label>
+            <div class="flex gap-2">
+              <input 
+                type="text" 
+                v-model="newDeploy.repoUrl" 
+                @keyup.enter="inspectRepo"
+                placeholder="https://github.com/owner/repository"
+                class="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-brand-500 text-white"
+              />
+              <button 
+                @click="inspectRepo" 
+                :disabled="inspectingRepo || !newDeploy.repoUrl"
+                class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                <span v-if="inspectingRepo" class="animate-spin">⏳</span>
+                <span v-else>🔍</span>
+                Phân tích
+              </button>
+            </div>
+          </div>
+
+          <!-- Inspection Error -->
+          <div v-if="newDeploy.inspectError" class="p-3.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{{ newDeploy.inspectError }}</span>
+          </div>
+
+          <!-- Inspection Result -->
+          <div v-if="newDeploy.inspection" class="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Kết quả nhận diện:</span>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-500/20 text-brand-300 border border-brand-500/30">
+                {{ newDeploy.inspection.title }}
+              </span>
+            </div>
+            <p class="text-xs text-slate-300">{{ newDeploy.inspection.description }}</p>
+
+            <!-- Monorepo breakdown -->
+            <div v-if="newDeploy.inspection.category === 'monorepo'" class="text-xs space-y-1 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-slate-300">
+              <div>🎨 <b>Frontend:</b> {{ newDeploy.inspection.frontendPath }} ({{ newDeploy.inspection.frontendFramework }})</div>
+              <div>⚙️ <b>Backend:</b> {{ newDeploy.inspection.backendPath }} ({{ newDeploy.inspection.backendFramework }})</div>
+            </div>
+
+            <!-- Target Selection -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Chọn nền tảng triển khai</label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label 
+                  v-for="target in newDeploy.inspection.supportedTargets" 
+                  :key="target" 
+                  class="flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all"
+                  :class="newDeploy.target === target ? 'bg-brand-600/10 border-brand-500 text-brand-300' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'">
+                  <input type="radio" :value="target" v-model="newDeploy.target" class="accent-brand-500" />
+                  <span class="text-xs font-semibold">
+                    {{ target === 'vps' ? '💻 VPS Nginx (Trực tiếp)' : (target === 'vercel' ? '▲ Vercel Cloud' : (target === 'render' ? '🔷 Render Web' : '🚀 Deploy Cả Hai (FE + BE)')) }}
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Subdomain Config -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Tên miền phụ (Subdomain)</label>
+              <div class="flex items-center">
+                <input 
+                  type="text" 
+                  v-model="newDeploy.subdomain" 
+                  class="w-48 px-3 py-2 bg-slate-950 border border-slate-700 rounded-l-xl text-sm font-mono text-white focus:outline-none focus:border-brand-500"
+                />
+                <span class="px-3 py-2 bg-slate-800 border border-l-0 border-slate-700 rounded-r-xl text-sm font-mono text-slate-400">
+                  .{{ newDeploy.baseDomain || 'thienhn.io.vn' }}
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-1">
+                {{ newDeploy.target === 'vps' ? '☁️ Cloudflare DNS: Bản ghi A trỏ về IP của VPS' : (newDeploy.target === 'vercel' ? '☁️ Cloudflare DNS: Bản ghi CNAME trỏ về cname.vercel-dns.com' : (newDeploy.target === 'render' ? '☁️ Cloudflare DNS: Bản ghi CNAME trỏ về Render' : '☁️ Cloudflare DNS: Tự động trỏ tên miền cho cả FE và BE')) }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Deploy Error -->
+          <div v-if="newDeploy.deployError" class="p-3.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{{ newDeploy.deployError }}</span>
+          </div>
+
+          <!-- Modal Action Buttons -->
+          <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+            <button 
+              @click="closeDeployModal" 
+              class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-medium transition-all">
+              Đóng
+            </button>
+            <button 
+              @click="executeDeploy" 
+              :disabled="deploying || !newDeploy.inspection || !newDeploy.target || !newDeploy.subdomain"
+              class="px-5 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-brand-500/25 flex items-center gap-2">
+              <span v-if="deploying" class="animate-spin">⏳</span>
+              <span v-else>🚀</span>
+              Triển khai ngay
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- TOAST NOTIFICATION -->
@@ -470,6 +603,120 @@
           }
         }
 
+        // Deploy Modal State & Logic
+        const showDeployModal = ref(false);
+        const inspectingRepo = ref(false);
+        const deploying = ref(false);
+        const newDeploy = ref({
+          repoUrl: '',
+          inspection: null,
+          target: '',
+          subdomain: '',
+          baseDomain: 'thienhn.io.vn',
+          inspectError: '',
+          deployError: '',
+        });
+
+        function openDeployModal() {
+          newDeploy.value = {
+            repoUrl: '',
+            inspection: null,
+            target: '',
+            subdomain: '',
+            baseDomain: 'thienhn.io.vn',
+            inspectError: '',
+            deployError: '',
+          };
+          showDeployModal.value = true;
+        }
+
+        function closeDeployModal() {
+          showDeployModal.value = false;
+        }
+
+        async function inspectRepo() {
+          if (!newDeploy.value.repoUrl) return;
+          inspectingRepo.value = true;
+          newDeploy.value.inspectError = '';
+          newDeploy.value.inspection = null;
+
+          try {
+            const res = await apiRequest('/api/deployments/inspect', {
+              method: 'POST',
+              body: JSON.stringify({ repoUrl: newDeploy.value.repoUrl }),
+            });
+
+            if (res.ok) {
+              newDeploy.value.inspection = res.inspection;
+              newDeploy.value.target = res.inspection.suggestedTarget || res.inspection.supportedTargets[0] || 'vps';
+              newDeploy.value.subdomain = res.suggestedSubdomain || res.inspection.repo;
+              newDeploy.value.baseDomain = res.baseDomain || 'thienhn.io.vn';
+            } else {
+              newDeploy.value.inspectError = res.error || 'Không thể phân tích repository này';
+            }
+          } catch (err) {
+            newDeploy.value.inspectError = err.message || 'Lỗi kết nối khi phân tích repository';
+          } finally {
+            inspectingRepo.value = false;
+          }
+        }
+
+        async function executeDeploy() {
+          if (!newDeploy.value.inspection || !newDeploy.value.target || !newDeploy.value.subdomain) return;
+          deploying.value = true;
+          newDeploy.value.deployError = '';
+
+          try {
+            if (newDeploy.value.target === 'both') {
+              const feRes = await apiRequest('/api/deployments/deploy-git', {
+                method: 'POST',
+                body: JSON.stringify({
+                  repoUrl: newDeploy.value.repoUrl,
+                  target: 'vercel',
+                  subdomain: newDeploy.value.subdomain,
+                }),
+              });
+              const beRes = await apiRequest('/api/deployments/deploy-git', {
+                method: 'POST',
+                body: JSON.stringify({
+                  repoUrl: newDeploy.value.repoUrl,
+                  target: 'render',
+                  subdomain: `api-${newDeploy.value.subdomain}`,
+                }),
+              });
+
+              if (feRes.ok && beRes.ok) {
+                showToast(`Triển khai thành công Monorepo (Frontend & Backend)!`);
+                closeDeployModal();
+                fetchData();
+              } else {
+                newDeploy.value.deployError = feRes.error || beRes.error || 'Lỗi khi triển khai monorepo';
+              }
+            } else {
+              const res = await apiRequest('/api/deployments/deploy-git', {
+                method: 'POST',
+                body: JSON.stringify({
+                  repoUrl: newDeploy.value.repoUrl,
+                  target: newDeploy.value.target,
+                  subdomain: newDeploy.value.subdomain,
+                }),
+              });
+
+              if (res.ok) {
+                showToast(`Triển khai thành công: ${res.deployment?.url || newDeploy.value.subdomain}`);
+                closeDeployModal();
+                fetchData();
+              } else {
+                newDeploy.value.deployError = res.error || 'Lỗi khi triển khai dự án';
+              }
+            }
+          } catch (err) {
+            newDeploy.value.deployError = err.message || 'Lỗi khi gửi yêu cầu triển khai';
+          } finally {
+            deploying.value = false;
+          }
+        }
+
         const filteredDeployments = computed(() => {
           return deployments.value.filter((d) => {
             const matchTarget = targetFilter.value === 'all' || d.target === targetFilter.value;
@@ -516,6 +763,14 @@
           fetchData,
           confirmUndeploy,
           formatDate,
+          showDeployModal,
+          inspectingRepo,
+          deploying,
+          newDeploy,
+          openDeployModal,
+          closeDeployModal,
+          inspectRepo,
+          executeDeploy,
         };
       }
     }).mount('#app');

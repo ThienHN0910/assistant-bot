@@ -77,7 +77,19 @@ async function testDashboardApi() {
     },
   };
 
-  const server = createDashboardServer(config, { axios: mockHttpClient });
+  const mockInspector = {
+    inspectRepo: async (url) => ({
+      owner: 'my-org',
+      repo: 'my-static-web',
+      category: 'static_pure',
+      title: 'HTML/CSS/JS Thuần (Static Web)',
+      description: 'Dự án tĩnh thuần không cần build.',
+      suggestedTarget: 'vps',
+      supportedTargets: ['vps', 'vercel'],
+    }),
+  };
+
+  const server = createDashboardServer(config, { axios: mockHttpClient, inspector: mockInspector });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const testPort = server.address().port;
   config.dashboardPort = testPort;
@@ -227,6 +239,7 @@ async function testDashboardApi() {
     assert.strictEqual(depRes.data.ok, true);
     assert(Array.isArray(depRes.data.deployments));
     assert.strictEqual(depRes.data.deployments[0].name, 'app-test');
+    assert(depRes.data.deployments[0].dnsTarget.includes('A Record'));
     console.log('✅ dashboardApi /api/deployments with Bearer session token test passed');
 
     // 10. Access /api/status telemetry with session token
@@ -245,6 +258,33 @@ async function testDashboardApi() {
     const afterRes = await client.get('/api/deployments', { headers: authHeaders });
     assert.strictEqual(afterRes.data.deployments.some((d) => d.name === 'app-test'), false);
     console.log('✅ dashboardApi /api/deployments/undeploy test passed');
+
+    // 12. GET / serves dashboard/index.html
+    const rootRes = await client.get('/');
+    assert.strictEqual(rootRes.status, 200);
+    assert(rootRes.headers['content-type'].includes('text/html'));
+    assert(rootRes.data.includes('DevOps Dashboard'));
+    console.log('✅ dashboardApi GET / serves index.html test passed');
+
+    // 13. POST /api/deployments/inspect endpoint
+    const inspectRes = await client.post(
+      '/api/deployments/inspect',
+      { repoUrl: 'https://github.com/my-org/my-static-web' },
+      { headers: authHeaders }
+    );
+    assert.strictEqual(inspectRes.status, 200);
+    assert.strictEqual(inspectRes.data.ok, true);
+    assert.strictEqual(inspectRes.data.suggestedSubdomain, 'my-static-web');
+    assert.strictEqual(inspectRes.data.baseDomain, 'thienhn.io.vn');
+
+    // Missing repoUrl returns 400
+    const badInspectRes = await client.post('/api/deployments/inspect', {}, { headers: authHeaders });
+    assert.strictEqual(badInspectRes.status, 400);
+
+    // Missing target or repoUrl for deploy-git returns 400
+    const badDeployRes = await client.post('/api/deployments/deploy-git', {}, { headers: authHeaders });
+    assert.strictEqual(badDeployRes.status, 400);
+    console.log('✅ dashboardApi /api/deployments/inspect and deploy-git tests passed');
   } finally {
     if (typeof server.closeAllConnections === 'function') {
       server.closeAllConnections();

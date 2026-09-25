@@ -1,8 +1,11 @@
 const http = require('http');
 const crypto = require('crypto');
+const fs = require('fs/promises');
+const path = require('path');
 const axios = require('axios');
 const si = require('systeminformation');
 const deployer = require('../lib/deployer');
+const repoInspector = require('../lib/repoInspector');
 const { formatFileSize } = require('../config/utils');
 
 let serverInstance = null;
@@ -142,6 +145,8 @@ function checkAuth(req, config) {
 
 function createDashboardServer(config, deps = {}) {
   const httpClient = deps.axios || axios;
+  const depDeployer = deps.deployer || deployer;
+  const depInspector = deps.inspector || repoInspector;
 
   const server = http.createServer(async (req, res) => {
     setCorsHeaders(req, res, config);
@@ -164,6 +169,20 @@ function createDashboardServer(config, deps = {}) {
 
     const urlObj = new URL(req.url, 'http://localhost');
     const pathname = urlObj.pathname;
+
+    // 0. Serve Dashboard UI index.html (public)
+    if ((pathname === '/' || pathname === '/index.html') && req.method === 'GET') {
+      try {
+        const htmlPath = path.resolve(__dirname, '../dashboard/index.html');
+        const html = await fs.readFile(htmlPath, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(html);
+        return;
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: 'Dashboard UI HTML file not found' });
+        return;
+      }
+    }
 
     // 1. Health check (no auth needed)
     if (pathname === '/api/health' && req.method === 'GET') {
@@ -309,7 +328,18 @@ function createDashboardServer(config, deps = {}) {
     // 6. List All Deployments
     if (pathname === '/api/deployments' && req.method === 'GET') {
       try {
-        const deployments = await deployer.listAllDeployments(config);
+        const rawDeployments = await depDeployer.listAllDeployments(config);
+        const deployments = rawDeployments.map((d) => {
+          let dnsTarget = 'Chưa xác định';
+          if (d.target === 'vps') {
+            dnsTarget = `A Record -> ${config.vpsPublicIp || 'VPS IP'}`;
+          } else if (d.target === 'vercel') {
+            dnsTarget = `CNAME -> ${d.cnameTarget || 'cname.vercel-dns.com'}`;
+          } else if (d.target === 'render') {
+            dnsTarget = `CNAME -> ${d.cnameTarget || '*.onrender.com'}`;
+          }
+          return { ...d, dnsTarget };
+        });
         sendJson(res, 200, { ok: true, deployments });
       } catch (err) {
         sendJson(res, 500, { ok: false, error: err.message });
@@ -317,7 +347,54 @@ function createDashboardServer(config, deps = {}) {
       return;
     }
 
-    // 7. Undeploy
+    // 7. Inspect GitHub Repo (Dashboard)
+    if (pathname === '/api/deployments/inspect' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        if (!body.repoUrl) {
+          sendJson(res, 400, { ok: false, error: 'Thiếu repoUrl' });
+          return;
+        }
+        const inspection = await depInspector.inspectRepo(body.repoUrl, { client: httpClient });
+        const suggestedSubdomain = await depDeployer.resolveAvailableSubdomain(inspection.repo, config);
+        sendJson(res, 200, {
+          ok: true,
+          inspection,
+          suggestedSubdomain,
+          baseDomain: config.baseDomain || 'thienhn.io.vn',
+        });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    // 8. Deploy GitHub Repo (Dashboard)
+    if (pathname === '/api/deployments/deploy-git' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        if (!body.repoUrl || !body.target) {
+          sendJson(res, 400, { ok: false, error: 'Thiếu thông tin repoUrl hoặc target' });
+          return;
+        }
+        const result = await depDeployer.deploy(
+          {
+            source: 'github_public',
+            repoUrl: body.repoUrl,
+            projectName: body.projectName || body.subdomain,
+            target: body.target,
+            subdomain: body.subdomain,
+          },
+          config
+        );
+        sendJson(res, 200, { ok: true, deployment: result.deployment });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    // 9. Undeploy
     if (pathname === '/api/deployments/undeploy' && req.method === 'POST') {
       try {
         const body = await parseJsonBody(req);
@@ -325,7 +402,7 @@ function createDashboardServer(config, deps = {}) {
           sendJson(res, 400, { ok: false, error: 'Thiếu tên dự án cần xóa (name)' });
           return;
         }
-        const result = await deployer.undeploy(body.name, config);
+        const result = await depDeployer.undeploy(body.name, config);
         sendJson(res, 200, { ok: true, undeployed: result });
       } catch (err) {
         sendJson(res, 500, { ok: false, error: err.message });
