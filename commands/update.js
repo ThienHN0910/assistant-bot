@@ -4,7 +4,7 @@ const runner = require('../lib/runner');
 
 function buildStepOutput(step, res) {
   const parts = [];
-  parts.push(`Lệnh: ${step.cmd} ${ (step.args || []).join(' ') }`.trim());
+  parts.push(`Lệnh: ${step.cmd} ${(step.args || []).join(' ')}`.trim());
   parts.push(`Trạng thái: ${res.ok ? 'Thành công' : 'Thất bại'}`);
   if (res.stdout) {
     parts.push('');
@@ -23,34 +23,42 @@ function buildStepOutput(step, res) {
   return parts.join('\n');
 }
 
+const DEFAULT_UPDATE_STEPS = [
+  { cmd: 'git', args: ['pull', 'origin', 'main'] },
+  { cmd: 'npm', args: ['install', '--omit=dev'] },
+];
+
 module.exports = {
   name: 'update',
-  description: 'Tự động cập nhật mã nguồn bot và khởi động lại (git-pull, npm-install, npm-build, pm2-restart)',
-  execute: async (ctx) => {
+  description: 'Tự động cập nhật mã nguồn bot và khởi động lại (git-pull, npm-install, pm2-restart)',
+  DEFAULT_UPDATE_STEPS,
+  execute: async (ctx, config = {}, deps = {}) => {
     try {
       const text = ctx.message?.text || '';
       const args = text.trim().split(/\s+/).slice(1);
       if (args.includes('-h') || args.includes('--help')) {
         await ctx.replyWithHTML(
           `ℹ️ <b>Hướng dẫn lệnh /update</b>\n` +
-          `Tự động cập nhật mã nguồn bot từ GitHub, cài đặt các thư viện mới nếu có, biên dịch dự án và khởi động lại tiến trình PM2 quản lý bot.\n\n` +
+          `Tự động cập nhật mã nguồn bot từ GitHub, cài đặt các thư viện mới nếu có và khởi động lại tiến trình PM2 quản lý bot.\n\n` +
           `<b>Cú pháp:</b> <code>/update</code>\n` +
           `<b>Ví dụ:</b> <code>/update</code>`
         );
         return;
       }
 
+      const depWhitelist = deps.whitelist || whitelist;
+      const depRunner = deps.runner || runner;
+
       let commands;
       try {
-        commands = whitelist.getCommands('update', []);
-      } catch (err) {
-        await ctx.replyWithHTML(`🚫 Lỗi cấu hình whitelist: ${escapeHtml(String(err.message || err))}`);
-        return;
+        commands = depWhitelist.getCommands('update', []);
+      } catch {
+        commands = DEFAULT_UPDATE_STEPS;
       }
 
       await ctx.replyWithHTML('🚀 <b>Bắt đầu quá trình Cập nhật Bot tự động...</b>\n<i>Vui lòng đợi (quá trình có thể mất từ vài chục giây đến 1 phút)...</i>');
 
-      const results = await runner.runSequence(commands, { timeoutMs: 90000 });
+      const results = await depRunner.runSequence(commands, { timeoutMs: 90000 });
 
       const blocks = [];
       for (let i = 0; i < commands.length; i++) {
@@ -80,13 +88,14 @@ module.exports = {
         if (success) {
           await ctx.replyWithHTML(`🔄 <b>Đang khởi động lại Bot để áp dụng thay đổi...</b>\n<i>Tiến trình sẽ hoạt động trở lại sau vài giây.</i>`);
           
+          const restartDelay = typeof deps.restartDelay === 'number' ? deps.restartDelay : 1500;
           setTimeout(() => {
-            const { exec } = require('child_process');
-            const processName = process.env.PM2_PROCESS_NAME || 'assistant-bot';
-            exec(`pm2 restart ${processName}`, (err) => {
+            const execFn = deps.exec || require('child_process').exec;
+            const processName = process.env.PM2_PROCESS_NAME || config?.pm2ProcessName || 'assistant-bot';
+            execFn(`pm2 restart ${processName}`, (err) => {
               if (err) console.error('[PM2_RESTART_ERROR]', err);
             });
-          }, 1500);
+          }, restartDelay);
         }
       } catch (sendErr) {
         console.error('[UPDATE_REPLY_ERROR]', sendErr);
