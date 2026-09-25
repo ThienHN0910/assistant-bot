@@ -7,6 +7,8 @@ const {
   createDashboardServer,
   createSessionToken,
   verifySessionToken,
+  startDashboardServer,
+  stopDashboardServer,
 } = require('../services/dashboardApi');
 
 async function testDashboardApi() {
@@ -22,13 +24,12 @@ async function testDashboardApi() {
     'utf8'
   );
 
-  const testPort = 3899;
   const sessionSecret = 'test-session-secret-12345';
   const authorizedEmail = 'admin@thienhn.io.vn';
   const googleClientId = 'test-google-client-id.apps.googleusercontent.com';
 
   const config = {
-    dashboardPort: testPort,
+    dashboardPort: 0,
     googleClientId,
     authorizedGoogleEmail: authorizedEmail,
     sessionSecret,
@@ -77,7 +78,9 @@ async function testDashboardApi() {
   };
 
   const server = createDashboardServer(config, { axios: mockHttpClient });
-  await new Promise((resolve) => server.listen(testPort, '127.0.0.1', resolve));
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const testPort = server.address().port;
+  config.dashboardPort = testPort;
 
   const client = axios.create({
     baseURL: `http://127.0.0.1:${testPort}`,
@@ -98,6 +101,7 @@ async function testDashboardApi() {
       assert.strictEqual(loginRes.status, 503, 'Missing auth config must not issue a session');
       assert.strictEqual(loginRes.data.token, undefined);
     } finally {
+      missingConfigServer.closeAllConnections?.();
       await new Promise((resolve) => missingConfigServer.close(resolve));
     }
 
@@ -119,6 +123,7 @@ async function testDashboardApi() {
       );
       assert.strictEqual(sameOriginVerify.status, 200, 'Unconfigured CORS must not break same-origin verification');
     } finally {
+      sameOriginServer.closeAllConnections?.();
       await new Promise((resolve) => sameOriginServer.close(resolve));
     }
 
@@ -164,6 +169,7 @@ async function testDashboardApi() {
     assert.strictEqual(strangerRes.status, 403);
     assert(strangerRes.data.error.includes('không có quyền truy cập'));
     console.log('✅ dashboardApi /api/auth/google unauthorized email 403 test passed');
+
 
     // 6. Google Auth - Authorized email (200 OK + returns session token)
     const unverifiedRes = await client.post('/api/auth/google', { credential: 'unverified-admin-token' });
@@ -240,8 +246,23 @@ async function testDashboardApi() {
     assert.strictEqual(afterRes.data.deployments.some((d) => d.name === 'app-test'), false);
     console.log('✅ dashboardApi /api/deployments/undeploy test passed');
   } finally {
+    if (typeof server.closeAllConnections === 'function') {
+      server.closeAllConnections();
+    }
     await new Promise((resolve) => server.close(resolve));
     await fs.rm(testRoot, { recursive: true, force: true }).catch(() => {});
+  }
+
+  const boundServer = startDashboardServer({ ...config, dashboardPort: 0 });
+  try {
+    await new Promise((resolve) => boundServer.once('listening', resolve));
+    assert.strictEqual(boundServer.address().address, '127.0.0.1');
+  } finally {
+    if (typeof boundServer.closeAllConnections === 'function') {
+      boundServer.closeAllConnections();
+    }
+    await new Promise((resolve) => boundServer.close(resolve));
+    stopDashboardServer();
   }
 }
 

@@ -1,5 +1,7 @@
 # Multi-Target Deployment and Subdomain Routing Strategy
 
+> Superseded by ADR-0003 for deployment sources, targets, and DNS routing. Do not use the wildcard or ZIP-to-Vercel rules below for new work.
+
 ## Context
 The bot originally deployed applications only to the local VPS using incremental port numbers (`http://<ip>:<port>`), lacking SSL and requiring manual firewall management. The user requested automatic subdomain provisioning using their domain `thienhn.io.vn` managed on Cloudflare, along with support for external deployment targets (Vercel and Render), multi-source inputs (ZIP archives and public GitHub repositories), and a unified Vue 3 web dashboard.
 

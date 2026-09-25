@@ -54,6 +54,9 @@ function getConfig() {
   const dashboardAllowedOrigin = (process.env.DASHBOARD_ALLOWED_ORIGIN || '').trim();
   const dashboardPort = Number(process.env.DASHBOARD_PORT) || 3001;
 
+  // IP Public của VPS (Tùy chọn, nếu không điền bot sẽ tự động nhận diện)
+  const vpsPublicIp = (process.env.VPS_PUBLIC_IP || '').trim();
+
   return {
     botToken,
     authorizedTelegramId,
@@ -64,6 +67,7 @@ function getConfig() {
     webDeployDir,
     uploadDir,
     webPortStart,
+    vpsPublicIp,
     cloudflareApiToken,
     cloudflareZoneId,
     vercelToken,

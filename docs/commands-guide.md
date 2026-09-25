@@ -93,31 +93,37 @@ Do bot có khả năng thực thi các câu lệnh hệ thống và truy cập d
 ### `/deploy`
 *   **Chức năng**: Tự động triển khai ứng dụng đa nền tảng (VPS Nginx, Vercel, Render) kèm cấp tự động Subdomain `https://<tên_dự_án>.<base_domain>`.
 *   **Cách dùng**:
-    *   **Cách 1 (Bấm nút trên Telegram)**: Gõ `/deploy` để hiện danh sách các file `.zip` có sẵn trong thư mục upload, bấm chọn file và chọn nền tảng (`VPS` hoặc `Vercel`).
-    *   **Cách 2 (Gõ lệnh trực tiếp)**: `/deploy <tên_file.zip> [vps|vercel]`
+    *   **Cách 1 (Bấm nút trên Telegram)**: Gõ `/deploy` để hiện danh sách các file `.zip` có sẵn trong thư mục upload và triển khai lên VPS.
+    *   **Cách 2 (Gõ lệnh trực tiếp)**: `/deploy <tên_file.zip>`
 *   **Chi tiết hoạt động**:
-    *   **Trên VPS**: Tự động giải nén, phát hiện loại dự án (Web tĩnh hoặc Node.js Backend PM2), sinh Virtual Host Nginx với `server_name <dự_án>.<base_domain>` cổng 80/443, tận dụng Cloudflare Wildcard DNS.
+    *   **Trên VPS**: Giải nén, phát hiện web tĩnh hoặc Node.js backend, cấu hình Nginx HTTPS và tạo bản ghi A riêng cho `<dự_án>.<base_domain>`. Web tĩnh không dùng port ứng dụng.
     *   **Trên Vercel**: Tự động tạo project, gán subdomain và gọi Cloudflare API tạo CNAME record trỏ về `cname.vercel-dns.com`.
+    *   **Lưu ý về Vercel/Render**: Hai lựa chọn này tạm ẩn và lời gọi deploy trực tiếp bị chặn; Vercel chưa tải mã nguồn ZIP lên, Render chưa kiểm chứng readiness (theo dõi issue #36). Xóa deployment cloud cũ vẫn được hỗ trợ.
 
 ### Nhận diện thông minh link GitHub công khai
 *   **Chức năng**: Triển khai mã nguồn từ bất kỳ kho lưu trữ GitHub công khai nào trực tiếp từ khung chat Telegram.
 *   **Cách dùng**: Chỉ cần copy và dán đường link GitHub (ví dụ: `https://github.com/owner/my-react-app`) vào bot.
 *   **Chi tiết hoạt động**:
     *   Bot nhận diện URL GitHub, tự động tạo đề xuất subdomain.
-    *   Hiển thị bàn phím nút bấm chọn nền tảng: `[ ▲ Deploy lên Vercel ]` hoặc `[ 🟣 Deploy lên Render ]`.
+    *   Hiện thông báo Vercel/Render tạm ẩn thay vì nút deploy có thể báo thành công sai.
     *   *Lưu ý bảo mật*: Link GitHub công khai không được phép deploy trực tiếp lên VPS để đảm bảo an toàn tuyệt đối cho máy chủ.
+
+### `/deploy_web`
+*   **Chức năng**: Triển khai ZIP lên VPS qua cùng luồng `/deploy`, tạo bản ghi A thuộc deployment.
+*   **Cách dùng**: `/deploy_web <project> <file.zip>`; ví dụ `/deploy_web test site.zip` cho URL `https://test.thienhn.io.vn`.
 
 ### `/web_list`
 *   **Chức năng**: Liệt kê toàn bộ các dự án đang hoạt động trên cả VPS và Cloud (Vercel, Render) kèm tên miền HTTPS và dung lượng.
 *   **Cách dùng**: `/web_list`
 
 ### `/web_remove`
-*   **Chức năng**: Gỡ bỏ dự án, dừng tiến trình PM2, xóa Virtual Host / Cloud Service và thu hồi CNAME DNS trên Cloudflare.
+*   **Chức năng**: Gỡ bỏ dự án, dừng tiến trình PM2, xóa Virtual Host / Cloud Service và thu hồi bản ghi A/CNAME thuộc deployment trên Cloudflare. Nếu một bước thất bại, trạng thái được giữ để thử lại.
 *   **Cách dùng**: `/web_remove <tên_dự_án>`
+*   **Web cũ**: Web chỉ dùng port và không có DNS có thể gỡ bỏ; nếu Cloudflare đang có bản ghi chưa được registry xác nhận quyền sở hữu, bot sẽ từ chối xóa để tránh đụng DNS của dịch vụ khác.
 
 ### Web Dashboard Vue 3 (`https://dashboard.<base_domain>`)
 *   **Chức năng**: Giao diện đồ họa Vue 3 Single Page Application xem trực quan tình trạng phần cứng máy chủ (CPU, RAM, Disk, Uptime) và danh sách tất cả các ứng dụng đã triển khai.
-*   **Bảo mật**: Khóa bằng mã PIN / Secret Token cấu hình tại `DASHBOARD_SECRET_KEY`.
+*   **Bảo mật**: Đăng nhập Google với `GOOGLE_CLIENT_ID`, `AUTHORIZED_GOOGLE_EMAIL` và `SESSION_SECRET`; thiếu cấu hình thì API quản lý từ chối truy cập.
 *   **Hỗ trợ**: Tìm kiếm, lọc theo nền tảng (VPS / Vercel / Render), mở nhanh trang web và xóa dự án chỉ với 1 click.
 
 ---

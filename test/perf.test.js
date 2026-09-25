@@ -40,10 +40,35 @@ async function testPerfCommand() {
   console.log('✅ perf command definition test passed');
 }
 
+async function testResolveTargetUrl() {
+  const config = {
+    baseDomain: 'thienhn.io.vn',
+    deployRegistryPath: './non-existent-deployments.json',
+  };
+
+  // Full URL
+  const u1 = await perfCommand.resolveTargetUrl('https://example.com/test', config);
+  assert.strictEqual(u1, 'https://example.com/test');
+
+  // Domain with dot
+  const u2 = await perfCommand.resolveTargetUrl('bot.thienhn.io.vn', config);
+  assert.strictEqual(u2, 'https://bot.thienhn.io.vn');
+
+  // Subdomain name
+  const u3 = await perfCommand.resolveTargetUrl('portfolio', config);
+  assert.strictEqual(u3, 'https://portfolio.thienhn.io.vn');
+
+  const oldPort = await perfCommand.resolveTargetUrl('8081', config);
+  assert.strictEqual(oldPort, null, 'Raw application ports are no longer public perf targets');
+
+  console.log('✅ perf resolveTargetUrl HTTPS resolution test passed');
+}
+
 async function run() {
   await testPerfLatency();
   await testPageSpeedLocalSkip();
   await testPerfCommand();
+  await testResolveTargetUrl();
 }
 
 run().catch((err) => {

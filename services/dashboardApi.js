@@ -340,16 +340,19 @@ function createDashboardServer(config, deps = {}) {
 }
 
 function startDashboardServer(config) {
-  const port = config.dashboardPort || 3001;
+  const port = config.dashboardPort ?? 3001;
   serverInstance = createDashboardServer(config);
-  serverInstance.listen(port, '0.0.0.0', () => {
-    console.log(`🌐 Dashboard API đang lắng nghe trên cổng: ${port}`);
+  serverInstance.listen(port, '127.0.0.1', () => {
+    console.log(`Dashboard API listening on localhost:${serverInstance.address().port}`);
   });
   return serverInstance;
 }
 
 function stopDashboardServer() {
   if (serverInstance) {
+    if (typeof serverInstance.closeAllConnections === 'function') {
+      serverInstance.closeAllConnections();
+    }
     serverInstance.close();
     serverInstance = null;
   }

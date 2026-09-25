@@ -1,98 +1,54 @@
+const fs = require('fs/promises');
+const path = require('path');
+const deployer = require('../lib/deployer');
 const { escapeHtml } = require('../config/utils');
-const whitelist = require('../lib/whitelist');
-const runner = require('../lib/runner');
 
-function buildStepOutput(step, res) {
-  const parts = [];
-  parts.push(`Lệnh: ${step.cmd} ${ (step.args || []).join(' ') }`.trim());
-  parts.push(`Trạng thái: ${res.ok ? 'Thành công' : 'Thất bại'}`);
-  if (res.stdout) {
-    parts.push('');
-    parts.push('stdout:');
-    parts.push(res.stdout.trimEnd());
+async function resolveZipPath(zipName, uploadDir) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.zip$/i.test(zipName) || zipName.includes('..')) {
+    throw new Error('Tên file ZIP không hợp lệ');
   }
-  if (res.stderr) {
-    parts.push('');
-    parts.push('stderr:');
-    parts.push(res.stderr.trimEnd());
+  for (const dir of [uploadDir, path.dirname(uploadDir)]) {
+    const candidate = path.join(dir, zipName);
+    try {
+      if ((await fs.stat(candidate)).isFile()) return candidate;
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
   }
-  if (typeof res.code !== 'undefined') {
-    parts.push('');
-    parts.push(`exit code: ${res.code}`);
-  }
-  return parts.join('\n');
+  throw new Error(`Không tìm thấy file ZIP: ${zipName}`);
 }
 
 module.exports = {
   name: 'deploy_web',
-  description: 'Triển khai website tĩnh/SPA trong một lệnh duy nhất: /deploy_web <project> <zip> <server>',
-  execute: async (ctx) => {
+  description: 'Triển khai ZIP lên VPS tại <project>.thienhn.io.vn',
+  execute: async (ctx, config) => {
+    const args = (ctx.message?.text || '').trim().split(/\s+/).slice(1);
+    if (args.length !== 2 || args.includes('-h') || args.includes('--help')) {
+      await ctx.replyWithHTML(
+        'Cú pháp: <code>/deploy_web &lt;project&gt; &lt;file.zip&gt;</code>\n' +
+        'Ví dụ: <code>/deploy_web test site.zip</code> → <code>https://test.thienhn.io.vn</code>'
+      );
+      return;
+    }
+
     try {
-      const text = ctx.message?.text || '';
-      const args = text.trim().split(/\s+/).slice(1);
-
-      if (args.includes('-h') || args.includes('--help')) {
-        await ctx.replyWithHTML(
-          `ℹ️ <b>Hướng dẫn lệnh /deploy_web</b>\n` +
-          `Triển khai website tĩnh/SPA lên máy chủ Nginx chỉ trong một bước duy nhất bằng script Bash tự động.\n\n` +
-          `<b>Cú pháp:</b> <code>/deploy_web &lt;tên_project&gt; &lt;tên_file_zip&gt; &lt;tên_domain_hoặc_IP&gt;</code>\n` +
-          `<b>Tham số:</b>\n` +
-          `- <code>&lt;tên_project&gt;</code>: Tên thư mục dự án tạo trong /home/hnt/web/.\n` +
-          `- <code>&lt;tên_file_zip&gt;</code>: Tên file ZIP chứa bản build (ví dụ: dist.zip).\n` +
-          `- <code>&lt;tên_domain_hoặc_IP&gt;</code>: Tên miền hoặc địa chỉ IP để cấu hình virtual host Nginx.\n\n` +
-          `<b>Ví dụ mẫu:</b> <code>/deploy_web portfolio-vue dist.zip mydomain.com</code>`
-        );
-        return;
+      const [projectName, zipName] = args;
+      if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(projectName)) {
+        throw new Error('Tên project chỉ được dùng chữ, số và dấu gạch nối');
       }
-
-      if (args.length < 3) {
-        await ctx.replyWithHTML(
-          `⚠️ <b>Thiếu tham số!</b>\n` +
-          `Cú pháp: <code>/deploy_web &lt;tên_project&gt; &lt;tên_file_zip&gt; &lt;tên_domain_hoặc_IP&gt;</code>\n\n` +
-          `Ví dụ: <code>/deploy_web portfolio-vue dist.zip mydomain.com</code>`
-        );
-        return;
-      }
-
-      let commands;
-      try {
-        commands = whitelist.getCommands('deploy-web', args);
-      } catch (err) {
-        await ctx.replyWithHTML(`🚫 Lỗi cấu hình whitelist: ${escapeHtml(String(err.message || err))}`);
-        return;
-      }
-
-      await ctx.replyWithHTML(`🚀 <b>Bắt đầu triển khai dự án "${escapeHtml(args[0])}"...</b>\n<i>Vui lòng đợi thiết lập...</i>`);
-
-      const results = await runner.runSequence(commands, { timeoutMs: 120000 });
-
-      const blocks = [];
-      for (let i = 0; i < commands.length; i++) {
-        const step = commands[i];
-        const res = results[i] || { ok: false, stdout: '', stderr: 'Không có kết quả', code: null };
-        blocks.push(buildStepOutput(step, res));
-      }
-
-      const output = blocks.join('\n\n-----\n\n');
-      const escaped = escapeHtml(output);
-
-      // Gửi kết quả
-      try {
-        if (escaped.length <= 3500) {
-          await ctx.replyWithHTML(`✅ <b>Hoàn thành Triển khai! Kết quả chi tiết:</b>\n<pre>${escaped}</pre>`);
-        } else {
-          await ctx.replyWithHTML('✅ <b>Hoàn thành Triển khai!</b> Kết quả quá dài, gửi dưới dạng file đính kèm.');
-          const buffer = Buffer.from(output, 'utf8');
-          await ctx.replyWithDocument({ source: buffer, filename: `deploy-${args[0]}-output.txt` });
-        }
-      } catch (sendErr) {
-        console.error('[DEPLOY_WEB_REPLY_ERROR]', sendErr);
-        const truncated = escaped.slice(0, 3500) + '\n\n... (đã rút gọn)';
-        await ctx.replyWithHTML(`<pre>${truncated}</pre>`).catch(() => {});
-      }
+      const sourcePath = await resolveZipPath(zipName, config.uploadDir);
+      await ctx.replyWithHTML(`⏳ Đang triển khai <b>${escapeHtml(projectName)}</b>...`);
+      const result = await deployer.deploy({
+        source: 'zip_upload',
+        sourcePath,
+        projectName,
+        target: 'vps',
+      }, config);
+      if (!result.ok || result.deployment.status !== 'online') throw new Error('Triển khai chưa hoàn tất');
+      const url = escapeHtml(result.deployment.url);
+      await ctx.replyWithHTML(`✅ <b>Triển khai thành công:</b> <a href="${url}">${url}</a>`);
     } catch (error) {
-      console.error('[DEPLOY_WEB_COMMAND_ERROR]', error);
-      await ctx.replyWithHTML('⚠️ Không thể triển khai dự án lúc này.');
+      await ctx.replyWithHTML(`❌ <b>Triển khai thất bại:</b> ${escapeHtml(error.message || String(error))}`);
     }
   },
 };
