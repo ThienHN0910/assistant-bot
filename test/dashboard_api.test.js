@@ -101,6 +101,27 @@ async function testDashboardApi() {
       await new Promise((resolve) => missingConfigServer.close(resolve));
     }
 
+    const sameOriginServer = createDashboardServer({ ...config, dashboardAllowedOrigin: '' }, { axios: mockHttpClient });
+    await new Promise((resolve) => sameOriginServer.listen(0, '127.0.0.1', resolve));
+    try {
+      const sameOriginUrl = `http://127.0.0.1:${sameOriginServer.address().port}`;
+      const sameOriginClient = axios.create({ baseURL: sameOriginUrl, validateStatus: () => true });
+      const sameOriginLogin = await sameOriginClient.post(
+        '/api/auth/google',
+        { credential: 'valid-admin-token' },
+        { headers: { Origin: sameOriginUrl } }
+      );
+      assert.strictEqual(sameOriginLogin.status, 200, 'Unconfigured CORS must not break same-origin login');
+      const sameOriginVerify = await sameOriginClient.post(
+        '/api/auth/verify',
+        {},
+        { headers: { Origin: sameOriginUrl, Authorization: `Bearer ${sameOriginLogin.data.token}` } }
+      );
+      assert.strictEqual(sameOriginVerify.status, 200, 'Unconfigured CORS must not break same-origin verification');
+    } finally {
+      await new Promise((resolve) => sameOriginServer.close(resolve));
+    }
+
     // 1. Session Token Unit Tests
     assert.throws(() => createSessionToken(authorizedEmail, ''), /secret/i);
     const validToken = createSessionToken(authorizedEmail, sessionSecret);
