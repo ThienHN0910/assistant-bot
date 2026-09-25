@@ -7,14 +7,16 @@ const { formatFileSize } = require('../config/utils');
 
 let serverInstance = null;
 
-function setCorsHeaders(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+function setCorsHeaders(req, res, config) {
+  const origin = req.headers.origin;
+  if (!origin || !config.dashboardAllowedOrigin || origin !== config.dashboardAllowedOrigin) return;
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
 function sendJson(res, statusCode, data) {
-  setCorsHeaders(res);
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(data));
 }
@@ -124,9 +126,19 @@ function createDashboardServer(config, deps = {}) {
   const httpClient = deps.axios || axios;
 
   const server = http.createServer(async (req, res) => {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res, config);
+
+    const origin = req.headers.origin;
+    if ((req.method === 'POST' || req.method === 'OPTIONS') && origin && origin !== config.dashboardAllowedOrigin) {
+      sendJson(res, 403, { ok: false, error: 'Origin not allowed' });
+      return;
+    }
 
     if (req.method === 'OPTIONS') {
+      if (!origin || !config.dashboardAllowedOrigin) {
+        sendJson(res, 403, { ok: false, error: 'Origin not allowed' });
+        return;
+      }
       res.writeHead(204);
       res.end();
       return;

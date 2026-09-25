@@ -34,8 +34,8 @@ function getConfig() {
 
   // Cấu hình Web Sandbox & Deploy
   const baseDomain = (process.env.BASE_DOMAIN || 'thienhn.io.vn').trim().toLowerCase();
-  const webDeployDir = toAbsolutePath(process.env.WEB_DEPLOY_DIR || '/home/hnt/web');
-  const uploadDir = toAbsolutePath(process.env.UPLOAD_DIR || '/home/hnt/uploads');
+  const webDeployDir = toAbsolutePath(process.env.WEB_DEPLOY_DIR || './data/web');
+  const uploadDir = toAbsolutePath(process.env.UPLOAD_DIR || './data/uploads');
   const webPortStart = Number(process.env.WEB_PORT_START) || 8081;
 
   // Cấu hình Cloudflare DNS API (Tùy chọn)
@@ -50,7 +50,8 @@ function getConfig() {
   // Cấu hình Web Dashboard (Đăng nhập Google OAuth 2.0 độc quyền)
   const googleClientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
   const authorizedGoogleEmail = (process.env.AUTHORIZED_GOOGLE_EMAIL || '').trim().toLowerCase();
-  const sessionSecret = (process.env.SESSION_SECRET || 'assistant-bot-dashboard-session-salt').trim();
+  const sessionSecret = (process.env.SESSION_SECRET || '').trim();
+  const dashboardAllowedOrigin = (process.env.DASHBOARD_ALLOWED_ORIGIN || '').trim();
   const dashboardPort = Number(process.env.DASHBOARD_PORT) || 3001;
 
   return {
@@ -72,6 +73,7 @@ function getConfig() {
     googleClientId,
     authorizedGoogleEmail,
     sessionSecret,
+    dashboardAllowedOrigin,
     dashboardPort,
   };
 }

@@ -32,6 +32,7 @@ async function testDashboardApi() {
     googleClientId,
     authorizedGoogleEmail: authorizedEmail,
     sessionSecret,
+    dashboardAllowedOrigin: 'https://dashboard.example.invalid',
     deployRegistryPath: registryPath,
     baseDomain: 'thienhn.io.vn',
   };
@@ -176,6 +177,24 @@ async function testDashboardApi() {
 
     // 9. Access protected endpoint with Bearer session token
     const authHeaders = { Authorization: `Bearer ${sessionToken}` };
+    const rejectedOriginRes = await client.post(
+      '/api/deployments/undeploy',
+      { name: 'app-test' },
+      { headers: { ...authHeaders, Origin: 'https://foreign.example.invalid' } }
+    );
+    assert.strictEqual(rejectedOriginRes.status, 403);
+    assert.notStrictEqual(rejectedOriginRes.headers['access-control-allow-origin'], '*');
+    const allowedOriginRes = await client.post(
+      '/api/auth/verify',
+      {},
+      { headers: { ...authHeaders, Origin: 'https://dashboard.example.invalid' } }
+    );
+    assert.strictEqual(allowedOriginRes.status, 200);
+    assert.strictEqual(allowedOriginRes.headers['access-control-allow-origin'], 'https://dashboard.example.invalid');
+    const rejectedPreflight = await client.options('/api/deployments/undeploy', {
+      headers: { Origin: 'https://foreign.example.invalid' },
+    });
+    assert.strictEqual(rejectedPreflight.status, 403);
     const depRes = await client.get('/api/deployments', { headers: authHeaders });
     assert.strictEqual(depRes.status, 200);
     assert.strictEqual(depRes.data.ok, true);
