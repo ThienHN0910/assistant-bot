@@ -39,27 +39,30 @@ function parseJsonBody(req) {
 }
 
 function createSessionToken(email, secret) {
+  if (!secret || typeof secret !== 'string') throw new Error('Session secret is required');
   const payload = {
     email: (email || '').toLowerCase().trim(),
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days expiration
   };
   const dataStr = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = crypto.createHmac('sha256', secret || 'default-salt').update(dataStr).digest('base64url');
+  const signature = crypto.createHmac('sha256', secret).update(dataStr).digest('base64url');
   return `${dataStr}.${signature}`;
 }
 
 function verifySessionToken(token, secret, authorizedEmail) {
-  if (!token || typeof token !== 'string') return null;
+  if (!token || typeof token !== 'string' || !secret || !authorizedEmail) return null;
   const parts = token.split('.');
   if (parts.length !== 2) return null;
 
   const [dataStr, signature] = parts;
-  const expectedSig = crypto.createHmac('sha256', secret || 'default-salt').update(dataStr).digest('base64url');
-  if (signature !== expectedSig) return null;
+  const expectedSig = crypto.createHmac('sha256', secret).update(dataStr).digest('base64url');
+  const supplied = Buffer.from(signature);
+  const expected = Buffer.from(expectedSig);
+  if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) return null;
 
   try {
     const payload = JSON.parse(Buffer.from(dataStr, 'base64url').toString('utf8'));
-    if (payload.exp && Date.now() > payload.exp) return null;
+    if (!Number.isFinite(payload.exp) || Date.now() >= payload.exp) return null;
     if (authorizedEmail && payload.email !== authorizedEmail.toLowerCase().trim()) return null;
     return payload;
   } catch {
@@ -98,10 +101,7 @@ async function verifyGoogleIdToken(idToken, client = axios) {
 }
 
 function checkAuth(req, config) {
-  // If no authorized email configured in dev, allow access
-  if (!config.authorizedGoogleEmail) {
-    return true;
-  }
+  if (!config.authorizedGoogleEmail || !config.sessionSecret || !config.googleClientId) return false;
 
   const authHeader = req.headers.authorization || '';
   if (authHeader.startsWith('Bearer ')) {
@@ -150,6 +150,10 @@ function createDashboardServer(config, deps = {}) {
     // 3. Google Sign-In Authentication Endpoint
     if (pathname === '/api/auth/google' && req.method === 'POST') {
       try {
+        if (!config.authorizedGoogleEmail || !config.googleClientId || !config.sessionSecret) {
+          sendJson(res, 503, { ok: false, error: 'Dashboard authentication is not configured' });
+          return;
+        }
         const body = await parseJsonBody(req);
         const credential = body.credential || body.id_token;
 
@@ -175,7 +179,7 @@ function createDashboardServer(config, deps = {}) {
         }
 
         // Verify Google Client ID if configured
-        if (config.googleClientId && verifyRes.aud && verifyRes.aud !== config.googleClientId) {
+        if (!verifyRes.emailVerified || verifyRes.aud !== config.googleClientId) {
           sendJson(res, 403, {
             ok: false,
             error: 'Google Client ID không khớp với cấu hình hệ thống.',
@@ -297,10 +301,10 @@ function createDashboardServer(config, deps = {}) {
 }
 
 function startDashboardServer(config) {
-  const port = config.dashboardPort || 3001;
+  const port = config.dashboardPort ?? 3001;
   serverInstance = createDashboardServer(config);
-  serverInstance.listen(port, '0.0.0.0', () => {
-    console.log(`🌐 Dashboard API đang lắng nghe trên cổng: ${port}`);
+  serverInstance.listen(port, '127.0.0.1', () => {
+    console.log(`Dashboard API listening on localhost:${serverInstance.address().port}`);
   });
   return serverInstance;
 }

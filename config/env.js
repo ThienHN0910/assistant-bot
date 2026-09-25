@@ -50,8 +50,11 @@ function getConfig() {
   // Cấu hình Web Dashboard (Đăng nhập Google OAuth 2.0 độc quyền)
   const googleClientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
   const authorizedGoogleEmail = (process.env.AUTHORIZED_GOOGLE_EMAIL || '').trim().toLowerCase();
-  const sessionSecret = (process.env.SESSION_SECRET || 'assistant-bot-dashboard-session-salt').trim();
+  const sessionSecret = (process.env.SESSION_SECRET || '').trim();
   const dashboardPort = Number(process.env.DASHBOARD_PORT) || 3001;
+
+  // IP Public của VPS (Tùy chọn, nếu không điền bot sẽ tự động nhận diện)
+  const vpsPublicIp = (process.env.VPS_PUBLIC_IP || '').trim();
 
   return {
     botToken,
@@ -63,6 +66,7 @@ function getConfig() {
     webDeployDir,
     uploadDir,
     webPortStart,
+    vpsPublicIp,
     cloudflareApiToken,
     cloudflareZoneId,
     vercelToken,

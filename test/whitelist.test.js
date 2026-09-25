@@ -22,10 +22,18 @@ function testGetCommands_withApp() {
   assert(step.args.includes('assistant-bot'));
 }
 
+function testNoNestedShellAliases() {
+  for (const alias of ['ls', 'cd', 'cat', 'extract-deploy', 'nginx-create', 'mkdir-project', 'mv-zip', 'chmod-nginx', 'nginx-link', 'deploy-web']) {
+    assert.throws(() => whitelist.getCommands(alias, ['x']), /Unknown alias/);
+  }
+  assert.throws(() => whitelist.getCommands('pm2-restart', ['app;id']), /App not allowed/);
+}
+
 function runAll() {
   testListAliases();
   testGetCommands_noArg();
   testGetCommands_withApp();
+  testNoNestedShellAliases();
   console.log('All whitelist tests passed');
 }
 

@@ -93,31 +93,37 @@ Do bot có khả năng thực thi các câu lệnh hệ thống và truy cập d
 ### `/deploy`
 *   **Chức năng**: Tự động triển khai ứng dụng đa nền tảng (VPS Nginx, Vercel, Render) kèm cấp tự động Subdomain `https://<tên_dự_án>.<base_domain>`.
 *   **Cách dùng**:
-    *   **Cách 1 (Bấm nút trên Telegram)**: Gõ `/deploy` để hiện danh sách các file `.zip` có sẵn trong thư mục upload, bấm chọn file và chọn nền tảng (`VPS` hoặc `Vercel`).
-    *   **Cách 2 (Gõ lệnh trực tiếp)**: `/deploy <tên_file.zip> [vps|vercel]`
+    *   **Cách 1 (Bấm nút trên Telegram)**: Gõ `/deploy` để hiện danh sách các file `.zip` có sẵn trong thư mục upload và triển khai lên VPS.
+    *   **Cách 2 (Gõ lệnh trực tiếp)**: `/deploy <tên_file.zip>`
 *   **Chi tiết hoạt động**:
-    *   **Trên VPS**: Tự động giải nén, phát hiện loại dự án (Web tĩnh hoặc Node.js Backend PM2), sinh Virtual Host Nginx với `server_name <dự_án>.<base_domain>` cổng 80/443, tận dụng Cloudflare Wildcard DNS.
+    *   **Trên VPS**: Giải nén, phát hiện web tĩnh hoặc Node.js backend, cấu hình Nginx HTTPS và tạo bản ghi A riêng cho `<dự_án>.<base_domain>`. Web tĩnh không dùng port ứng dụng.
     *   **Trên Vercel**: Tự động tạo project, gán subdomain và gọi Cloudflare API tạo CNAME record trỏ về `cname.vercel-dns.com`.
+    *   **Lưu ý về Vercel/Render**: Hai lựa chọn này tạm ẩn và lời gọi deploy trực tiếp bị chặn; Vercel chưa tải mã nguồn ZIP lên, Render chưa kiểm chứng readiness (theo dõi issue #36). Xóa deployment cloud cũ vẫn được hỗ trợ.
 
 ### Nhận diện thông minh link GitHub công khai
 *   **Chức năng**: Triển khai mã nguồn từ bất kỳ kho lưu trữ GitHub công khai nào trực tiếp từ khung chat Telegram.
 *   **Cách dùng**: Chỉ cần copy và dán đường link GitHub (ví dụ: `https://github.com/owner/my-react-app`) vào bot.
 *   **Chi tiết hoạt động**:
     *   Bot nhận diện URL GitHub, tự động tạo đề xuất subdomain.
-    *   Hiển thị bàn phím nút bấm chọn nền tảng: `[ ▲ Deploy lên Vercel ]` hoặc `[ 🟣 Deploy lên Render ]`.
+    *   Hiện thông báo Vercel/Render tạm ẩn thay vì nút deploy có thể báo thành công sai.
     *   *Lưu ý bảo mật*: Link GitHub công khai không được phép deploy trực tiếp lên VPS để đảm bảo an toàn tuyệt đối cho máy chủ.
+
+### `/deploy_web`
+*   **Chức năng**: Triển khai ZIP lên VPS qua cùng luồng `/deploy`, tạo bản ghi A thuộc deployment.
+*   **Cách dùng**: `/deploy_web <project> <file.zip>`; ví dụ `/deploy_web test site.zip` cho URL `https://test.thienhn.io.vn`.
 
 ### `/web_list`
 *   **Chức năng**: Liệt kê toàn bộ các dự án đang hoạt động trên cả VPS và Cloud (Vercel, Render) kèm tên miền HTTPS và dung lượng.
 *   **Cách dùng**: `/web_list`
 
 ### `/web_remove`
-*   **Chức năng**: Gỡ bỏ dự án, dừng tiến trình PM2, xóa Virtual Host / Cloud Service và thu hồi CNAME DNS trên Cloudflare.
+*   **Chức năng**: Gỡ bỏ dự án, dừng tiến trình PM2, xóa Virtual Host / Cloud Service và thu hồi bản ghi A/CNAME thuộc deployment trên Cloudflare. Nếu một bước thất bại, trạng thái được giữ để thử lại.
 *   **Cách dùng**: `/web_remove <tên_dự_án>`
+*   **Web cũ**: Web chỉ dùng port và không có DNS có thể gỡ bỏ; nếu Cloudflare đang có bản ghi chưa được registry xác nhận quyền sở hữu, bot sẽ từ chối xóa để tránh đụng DNS của dịch vụ khác.
 
 ### Web Dashboard Vue 3 (`https://dashboard.<base_domain>`)
 *   **Chức năng**: Giao diện đồ họa Vue 3 Single Page Application xem trực quan tình trạng phần cứng máy chủ (CPU, RAM, Disk, Uptime) và danh sách tất cả các ứng dụng đã triển khai.
-*   **Bảo mật**: Khóa bằng mã PIN / Secret Token cấu hình tại `DASHBOARD_SECRET_KEY`.
+*   **Bảo mật**: Đăng nhập Google với `GOOGLE_CLIENT_ID`, `AUTHORIZED_GOOGLE_EMAIL` và `SESSION_SECRET`; thiếu cấu hình thì API quản lý từ chối truy cập.
 *   **Hỗ trợ**: Tìm kiếm, lọc theo nền tảng (VPS / Vercel / Render), mở nhanh trang web và xóa dự án chỉ với 1 click.
 
 ---
@@ -148,21 +154,11 @@ Dưới đây là mô tả chi tiết của từng alias trong whitelist:
 | **`npm-install`**| Cài đặt các thư viện phụ thuộc. | `npm install` | `/sh /npm-install` |
 | **`npm-build`**  | Build dự án sang chế độ sản xuất. | `npm run build` | `/sh /npm-build` |
 | **`update`**     | Cập nhật mã nguồn và khởi động lại bot. | Chạy tuần tự: `git pull origin main` $\to$ `npm install` (sau đó tự động khởi động lại bot bất đồng bộ). | `/sh /update` *(Tương đương lệnh direct `/update`)* |
-| **`deploy-web`** | Triển khai website tĩnh/SPA trong 1 bước duy nhất (sử dụng script Bash). | Thực thi script `bash ./scripts/deploy-web.sh <project> <zip> <server>` tự động xử lý: tạo thư mục, chuyển zip, giải nén, chmod, tạo Virtual Host Nginx, tạo symlink, test và reload Nginx. | `/sh /deploy-web my-portfolio dist.zip mydomain.com`<br>*Tham số thứ tự: `[tên_project] [tên_file_zip] [tên_domain_hoặc_IP]` (Tương đương lệnh direct `/deploy_web`)* |
 | **`nginx-test`** | Kiểm tra cú pháp file cấu hình Nginx. | `sudo nginx -t` (yêu cầu quyền sudo) | `/sh /nginx-test` |
 | **`nginx-reload`**| Tải lại cấu hình Nginx không downtime. | `sudo systemctl reload nginx` (yêu cầu quyền sudo) | `/sh /nginx-reload` |
 | **`nginx-status`**| Xem trạng thái hoạt động của Nginx. | `sudo systemctl status nginx` (yêu cầu quyền sudo) | `/sh /nginx-status` |
 | **`pm2-list`**   | Liệt kê các ứng dụng PM2 đang chạy. | `pm2 list` | `/sh /pm2-list` |
 | **`pm2-restart`**| Khởi động lại một ứng dụng PM2 cụ thể.| `pm2 restart <app>` | `/sh /pm2-restart assistant-bot`<br>*Lưu ý: `<app>` phải nằm trong danh sách được phép: `assistant-bot`, `app`, `server`, `worker`* |
-| **`mkdir-project`**| Tạo thư mục cho dự án mới trên server. | `mkdir -p /home/hnt/web/<project>` | `/sh /mkdir-project my-new-website`<br>*Tạo thư mục `/home/hnt/web/my-new-website`* |
-| **`mv-zip`**     | Di chuyển file nén ZIP dự án. | `mv /home/hnt/<zip> /home/hnt/web/<project>` | `/sh /mv-zip dist.zip my-new-website`<br>*Di chuyển file `dist.zip` từ `/home/hnt` vào `/home/hnt/web/my-new-website`* |
-| **`extract-deploy`**| Giải nén và dọn dẹp deploy thủ công. | `cd /home/hnt/web/<project> && rm -rf dist && unzip -o <zip> && rm -f <zip>` (Chạy qua bash shell) | `/sh /extract-deploy my-new-website dist.zip` |
-| **`chmod-nginx`**| Phân quyền thư mục web cho Nginx. | 1. `sudo chmod +x /home/hnt`<br>2. `sudo chmod +x /home/hnt/web`<br>3. `sudo chmod -R 755 /home/hnt/web/<project>` | `/sh /chmod-nginx my-new-website` |
-| **`nginx-link`** | Tạo liên kết cấu hình Nginx ảo. | `sudo ln -s /etc/nginx/sites-available/<site> /etc/nginx/sites-enabled/` | `/sh /nginx-link my-new-website.conf` |
-| **`nginx-create`**| Tạo file cấu hình Virtual Host Nginx cho SPA (React, Vue, v.v.). | Tạo file cấu hình Nginx mẫu tại `/etc/nginx/sites-available/<site>` với cấu hình lắng nghe cổng 80, trỏ tên miền tới `<server>` và thư mục tĩnh là `<root>`. | `/sh /nginx-create my-site.conf mydomain.com /home/hnt/web/my-project/dist`<br>*Tham số thứ tự: `[tên_file_cấu_hình] [tên_miền] [đường_dẫn_root]`* |
-| **`ls`**         | Liệt kê nội dung trong thư mục chỉ định. | `bash -lc 'ls -la "<path>"'` | `/sh /ls /home/hnt/web` |
-| **`cd`**         | Chuyển thư mục hiện tại của phiên con. | `bash -lc 'cd "<path>" && pwd && ls -la'` | `/sh /cd /home/hnt/web/assistant-bot` |
-| **`cat`**        | Đọc nội dung của một file văn bản. | `bash -lc 'head -c 65536 "<file>"'` (Chỉ lấy tối đa 64KB đầu tiên để tránh tràn tin nhắn) | `/sh /cat /home/hnt/web/assistant-bot/.env` |
 
 ---
 

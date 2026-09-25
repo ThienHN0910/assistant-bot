@@ -31,17 +31,18 @@ module.exports = {
       lines.push('🌐 <b>DANH SÁCH DỰ ÁN ĐANG CHẠY (VPS & CLOUD)</b>\n');
 
       deployments.forEach((d, idx) => {
-        const url = d.url || (d.domain ? `https://${d.domain}` : (d.port ? `http://localhost:${d.port}` : 'N/A'));
+        const url = d.url || (d.domain ? `https://${d.domain}` : 'N/A');
         const typeLabel = d.type === 'backend' ? 'Node.js Backend' : 'Web Tĩnh';
         const deployedDate = d.deployedAt ? new Date(d.deployedAt).toLocaleString('vi-VN') : 'N/A';
         const targetLabel = d.target ? ` [${d.target.toUpperCase()}]` : '';
 
         lines.push(
           `<b>${idx + 1}. ${escapeHtml(d.name)}</b> [<code>${typeLabel}</code>]${targetLabel}\n` +
-          `   • URL: <a href="${url}">${url}</a>\n` +
+          `   • URL: ${url === 'N/A' ? 'N/A' : `<a href="${escapeHtml(url)}">${escapeHtml(url)}</a>`}\n` +
+          `   • Trạng thái: <code>${escapeHtml(d.status || 'unknown')}</code>\n` +
           `   • Dung lượng: <b>${d.sizeFormatted}</b>\n` +
           `   • Deploy: <i>${deployedDate}</i>\n` +
-          `   • Thao tác nhanh: <code>/perf ${d.port || d.name}</code> | <code>/web_remove ${d.name}</code>`
+          `   • Thao tác nhanh: <code>/perf ${d.name}</code> | <code>/web_remove ${d.name}</code>`
         );
       });
 

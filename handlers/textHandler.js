@@ -101,7 +101,7 @@ function createTextHandler(config) {
             `🐙 <b>Phát hiện kho lưu trữ GitHub:</b>\n` +
             `• Link: <code>${escapeHtml(repoUrl)}</code>\n` +
             `• Dự án: <b>${escapeHtml(projectName)}</b>\n\n` +
-            `⚠️ <i>Hiện chưa thể deploy vì bạn chưa cấu hình <code>VERCEL_TOKEN</code> hoặc <code>RENDER_API_KEY</code> trong .env.</i>\n` +
+            `⚠️ <i>Deploy GitHub lên Vercel/Render đang tạm ẩn cho đến khi kiểm chứng ứng dụng chạy thật (issue #36).</i>\n` +
             `<i>(Lưu ý: Kho lưu trữ GitHub công khai không được phép deploy trực tiếp lên VPS để đảm bảo an toàn).</i>`
           );
           return;

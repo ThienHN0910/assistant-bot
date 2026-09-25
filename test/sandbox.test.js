@@ -60,6 +60,9 @@ async function testSandbox() {
     assert.strictEqual(deployments[0].url, 'https://app1.thienhn.io.vn');
     assert.strictEqual(deployments[0].target, 'vps');
     assert.strictEqual(deployments[0].source, 'zip_upload');
+    await fs.writeFile(path.join(project1Dir, 'meta.json'), JSON.stringify({ name: 'app1', port: 8081, type: 'static' }));
+    const legacyDeployments = await sandbox.listDeployments(webDir);
+    assert.strictEqual(legacyDeployments[0].url, null, 'Legacy ports must not appear as public URLs');
     console.log('✅ sandbox listDeployments with subdomain metadata test passed');
 
     // 4. Test generateNginxConfig
@@ -89,6 +92,10 @@ async function testSandbox() {
     console.log('✅ sandbox generateNginxConfig Cloudflare SSL test passed');
 
     // 5. Test detectProjectType
+    const emptyDir = path.join(testRoot, 'empty-static');
+    await fs.mkdir(emptyDir, { recursive: true });
+    await assert.rejects(sandbox.detectProjectType(emptyDir), /index.html|entry point/i);
+    await fs.writeFile(path.join(project1Dir, 'index.html'), '<html></html>', 'utf8');
     const staticType = await sandbox.detectProjectType(project1Dir);
     assert.strictEqual(staticType, 'static', 'Should detect static');
 
@@ -99,6 +106,21 @@ async function testSandbox() {
     await fs.writeFile(path.join(backendDir, 'server.js'), 'console.log("server")', 'utf8');
     const backendType = await sandbox.detectProjectType(backendDir);
     assert.strictEqual(backendType, 'backend', 'Should detect backend');
+    const noEntrypointDir = path.join(testRoot, 'backend_without_entry');
+    await fs.mkdir(noEntrypointDir, { recursive: true });
+    await fs.writeFile(path.join(noEntrypointDir, 'package.json'), '{"dependencies":{"express":"^4.18.2"}}');
+    await assert.rejects(sandbox.detectProjectType(noEntrypointDir), /entry point|start script/i);
+    await fs.writeFile(path.join(noEntrypointDir, 'package.json'), '{"scripts":{"start":"node dist/main.js"},"dependencies":{"express":"^4.18.2"}}');
+    assert.strictEqual(await sandbox.detectProjectType(noEntrypointDir), 'backend');
+    await assert.rejects(
+      sandbox.waitForBackendListener(8081, async () => ({ ok: true, stdout: 'LISTEN 0 511 0.0.0.0:8081 0.0.0.0:*' }), 1, 0),
+      /public interface/i
+    );
+    await assert.rejects(
+      sandbox.waitForBackendListener(8081, async () => ({ ok: true, stdout: '' }), 1, 0),
+      /did not start listening/i
+    );
+    await sandbox.waitForBackendListener(8081, async () => ({ ok: true, stdout: 'LISTEN 0 511 127.0.0.1:8081 0.0.0.0:*' }), 1, 0);
 
     // 5b. Unbuilt frontend with Vite (must reject due to VPS 1GB RAM)
     const unbuiltViteDir = path.join(testRoot, 'unbuilt_vite');
@@ -123,6 +145,15 @@ async function testSandbox() {
     const prebuiltType = await sandbox.detectProjectType(unbuiltViteDir);
     assert.strictEqual(prebuiltType, 'static', 'Pre-built frontend should be detected as static');
     console.log('✅ sandbox detectProjectType RAM safety & detection test passed');
+
+    // A failed replacement attempt must not erase an existing working site.
+    const sentinel = path.join(project1Dir, 'keep.txt');
+    await fs.writeFile(sentinel, 'keep this site', 'utf8');
+    await assert.rejects(
+      sandbox.deployProject(path.join(uploadDir, 'app1.zip'), 'app1', null, { webDeployDir: webDir, baseDomain: 'thienhn.io.vn' }),
+      /already exists|archive/i
+    );
+    assert.strictEqual(await fs.readFile(sentinel, 'utf8'), 'keep this site');
 
     // 6. Test removeProject
     await sandbox.removeProject('app1', { webDeployDir: webDir });

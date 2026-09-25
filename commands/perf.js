@@ -1,47 +1,46 @@
-const axios = require('axios');
-const sandbox = require('../lib/sandbox');
+const deployer = require('../lib/deployer');
 const perf = require('../lib/perf');
 const { escapeHtml } = require('../config/utils');
-
-async function getPublicIp() {
-  try {
-    const res = await axios.get('https://api.ipify.org?format=json', { timeout: 3000 });
-    return res.data?.ip || 'localhost';
-  } catch {
-    return 'localhost';
-  }
-}
 
 async function resolveTargetUrl(input, config) {
   if (!input) return null;
   const trimmed = input.trim();
+  if (/^\d+$/.test(trimmed)) return null;
 
-  // 1. Nếu là URL đầy đủ
+  // 1. Nếu là URL đầy đủ (http:// hoặc https://)
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed;
   }
 
-  const publicIp = await getPublicIp();
+  // 2. Tra cứu trong danh mục dự án đã triển khai (VPS, Vercel, Render)
+  try {
+    const deployments = await deployer.listAllDeployments(config);
+    const found = deployments.find((d) =>
+      d.name?.toLowerCase() === trimmed.toLowerCase() ||
+      d.id?.toLowerCase() === trimmed.toLowerCase() ||
+      d.domain?.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (found) {
+      if (found.url) return found.url;
+      if (found.domain) return `https://${found.domain}`;
+    }
+  } catch {}
 
-  // 2. Nếu là số port (vd: 8081)
-  if (/^\d+$/.test(trimmed)) {
-    return `http://${publicIp}:${trimmed}`;
+  const baseDomain = config?.baseDomain || 'thienhn.io.vn';
+
+  // 3. Nếu là domain hoặc subdomain có chứa dấu chấm (vd: bot.thienhn.io.vn)
+  if (trimmed.includes('.')) {
+    return `https://${trimmed}`;
   }
 
-  // 3. Nếu là tên dự án trong sandbox
-  const deployments = await sandbox.listDeployments(config.webDeployDir);
-  const found = deployments.find((d) => d.name.toLowerCase() === trimmed.toLowerCase());
-  if (found && found.port) {
-    return `http://${publicIp}:${found.port}`;
-  }
-
-  // Fallback mặc định
-  return `http://${publicIp}:${trimmed}`;
+  // 4. Nếu là tên subdomain ngắn (vd: portfolio -> https://portfolio.thienhn.io.vn)
+  return `https://${trimmed}.${baseDomain}`;
 }
 
 module.exports = {
   name: 'perf',
   description: 'Đo lường hiệu năng trang web (TTFB, độ trễ HTTP và Google PageSpeed)',
+  resolveTargetUrl,
   execute: async (ctx, config) => {
     try {
       const text = ctx.message?.text || '';
@@ -50,11 +49,11 @@ module.exports = {
       if (!args.length || args.includes('-h') || args.includes('--help')) {
         await ctx.replyWithHTML(
           `ℹ️ <b>Hướng dẫn lệnh /perf</b>\n` +
-          `Đo độ trễ phản hồi tại chỗ (TTFB, DNS, Connect) và lấy điểm Google PageSpeed Insights cho trang web.\n\n` +
-          `<b>Cú pháp:</b> <code>/perf &lt;tên_project | port | url&gt;</code>\n\n` +
+          `Đo độ trễ phản hồi tại chỗ (TTFB, DNS, Connect) và lấy điểm Google PageSpeed Insights cho website.\n\n` +
+          `<b>Cú pháp:</b> <code>/perf &lt;tên_project | domain | url&gt;</code>\n\n` +
           `<b>Ví dụ:</b>\n` +
-          `• <code>/perf 8081</code> (Đo theo port test)\n` +
-          `• <code>/perf my-portfolio</code> (Đo theo tên dự án sandbox)\n` +
+          `• <code>/perf portfolio</code> (Đo theo tên dự án đã deploy)\n` +
+          `• <code>/perf bot.thienhn.io.vn</code> (Đo theo tên miền / subdomain)\n` +
           `• <code>/perf https://example.com</code> (Đo theo URL bất kỳ)`
         );
         return;

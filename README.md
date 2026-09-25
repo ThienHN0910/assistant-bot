@@ -26,14 +26,16 @@ Dự án được phát triển và lưu trữ trong portfolio kỹ thuật củ
 ### 2. 🚀 Web Sandbox & Deploy 1 chạm (Interactive Web Deploy)
 - `/deploy`: Tự động quét file `.zip` từ thư mục upload (`~` hoặc `~/uploads`), hiển thị **Inline Buttons** trên Telegram.
 - **Nhận diện thông minh**:
-  - **Web tĩnh / SPA** (React, Vue, Vite, HTML/CSS): Tự cấu hình Nginx port-based virtual host và reload.
+  - **Web tĩnh / SPA** (React, Vue, Vite, HTML/CSS): Nginx phục vụ trực tiếp qua HTTPS subdomain, không cấp port ứng dụng.
   - **Node.js Backend**: Tự chạy `npm install --omit=dev`, bật tiến trình con qua PM2 và cấu hình Nginx reverse proxy.
-- **Port Allocator**: Tự động cấp phát port độc lập (`8081`, `8082`,...) hoặc chọn port tùy ý (`/deploy app.zip 80`).
-- `/web_list`: Xem danh sách tất cả các web test đang chạy, port, loại hình, dung lượng đĩa và link truy cập.
-- `/web_remove <name>`: Gỡ bỏ web test, tắt PM2 liên quan, hủy virtual host Nginx và xóa folder để giải phóng ổ đĩa.
+- **Backend Node.js**: Port chỉ dùng nội bộ localhost phía sau Nginx; URL công khai luôn dùng subdomain HTTPS.
+- `/deploy_web <project> <file.zip>`: Triển khai ZIP lên VPS qua cùng luồng với `/deploy`.
+- Vercel/Render tạm ẩn khỏi luồng deploy cho đến khi provider xác nhận website thật sự sẵn sàng; xóa deployment cloud cũ vẫn hoạt động (issue #36).
+- `/web_list`: Xem danh sách web, trạng thái, dung lượng đĩa và URL HTTPS.
+- `/web_remove <name>`: Gỡ bỏ web và bản ghi DNS thuộc deployment; lỗi được giữ để thử lại.
 
 ### 3. ⚡ Đo đạc hiệu năng (Performance Benchmarking)
-- `/perf <name | port | url>`:
+- `/perf <name | domain | url>`:
   - **Đo độ trễ tại chỗ qua `curl -w` (0 MB RAM)**: Phân rã chi tiết thời gian phản hồi: DNS Lookup, TCP Connect, **TTFB (Time To First Byte)**, Total Duration, Size.
   - **Tích hợp Google PageSpeed Insights API**: Gọi API Google từ xa để chấm điểm Lighthouse Mobile (Score, FCP, LCP, TBT, CLS) mà không tốn 1MB RAM nào của VPS.
 
@@ -57,7 +59,7 @@ Tham khảo file [`.env.example`](.env.example):
 | `PM2_PROCESS_NAME` | Tên tiến trình PM2 của bot | `assistant-bot` |
 | `WEB_DEPLOY_DIR` | Thư mục chứa các web sandbox | `/home/hnt/web` |
 | `UPLOAD_DIR` | Thư mục nhận file zip upload | `/home/hnt/uploads` |
-| `WEB_PORT_START` | Port khởi đầu để cấp phát tự động | `8081` |
+| `WEB_PORT_START` | Port localhost khởi đầu cho backend Node.js | `8081` |
 | `PAGESPEED_API_KEY` | API Key Google PageSpeed Insights | *(Tuỳ chọn)* |
 
 ---
@@ -101,7 +103,7 @@ assistant-bot/
 ├── commands/               # Các mô-đun lệnh bot độc lập
 │   ├── cleancache.js       # Xả RAM cache và pm2 flush
 │   ├── deploy.js           # Deploy web tương tác qua file ZIP và inline keyboard
-│   ├── deploy_web.js       # Deploy script legacy
+│   ├── deploy_web.js       # Alias ZIP deploy trên VPS
 │   ├── ip.js               # Lấy IP public server
 │   ├── logs.js             # Đọc log lỗi PM2 an toàn (OOM-safe tail)
 │   ├── notes.js            # Xem và xóa ghi chú

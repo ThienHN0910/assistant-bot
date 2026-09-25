@@ -5,8 +5,11 @@ const sandbox = require('../lib/sandbox');
 const deployStore = require('../lib/deployStore');
 const { escapeHtml } = require('../config/utils');
 
-async function handleZipDeploy(ctx, zipName, target = 'vps', config, requestedPort = null) {
+async function handleZipDeploy(ctx, zipName, target = 'vps', config) {
   try {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.zip$/i.test(zipName) || zipName.includes('..')) {
+      throw new Error('Tên file ZIP không hợp lệ');
+    }
     let zipPath = path.join(config.uploadDir, zipName);
     if (!fsSync.existsSync(zipPath)) {
       const parentZip = path.join(path.dirname(config.uploadDir), zipName);
@@ -30,7 +33,6 @@ async function handleZipDeploy(ctx, zipName, target = 'vps', config, requestedPo
         sourcePath: zipPath,
         projectName,
         target,
-        port: requestedPort,
       },
       config
     );
@@ -43,9 +45,9 @@ async function handleZipDeploy(ctx, zipName, target = 'vps', config, requestedPo
       `• Nền tảng: <code>${dep.target.toUpperCase()}</code>\n` +
       `• Loại hình: <code>${dep.type === 'backend' ? 'Node.js Backend' : 'Web Tĩnh / SPA'}</code>\n` +
       `• Tên miền: <code>${escapeHtml(dep.domain || '')}</code>\n` +
-      `• URL truy cập: <a href="${dep.url}">${dep.url}</a>\n\n` +
+      `• URL truy cập: <a href="${escapeHtml(dep.url)}">${escapeHtml(dep.url)}</a>\n\n` +
       `<i>Tiện ích tiếp theo:</i>\n` +
-      (dep.port ? `• Kiểm tra hiệu năng: <code>/perf ${dep.port}</code>\n` : '') +
+      `• Kiểm tra hiệu năng: <code>/perf ${dep.name}</code>\n` +
       `• Xem danh sách web: <code>/web_list</code>\n` +
       `• Gỡ bỏ web khi xong: <code>/web_remove ${dep.name}</code>`
     );
@@ -112,10 +114,9 @@ module.exports = {
       if (args.includes('-h') || args.includes('--help')) {
         await ctx.replyWithHTML(
           `ℹ️ <b>Hướng dẫn lệnh /deploy</b>\n` +
-          `Hỗ trợ deploy tự động lên VPS (Nginx), Vercel hoặc Render kèm cấp subdomain tự động.\n\n` +
+          `Triển khai ZIP lên VPS qua Nginx HTTPS và subdomain riêng. Vercel/Render tạm ẩn cho đến khi kiểm chứng web chạy thật.\n\n` +
           `<b>Cách 1 (Bấm nút trên Telegram):</b> Gõ <code>/deploy</code> để chọn file .zip sẵn có.\n` +
-          `<b>Cách 2 (Dán link GitHub):</b> Dán trực tiếp link GitHub công khai vào khung chat để chọn deploy Vercel/Render.\n` +
-          `<b>Cách 3 (Gõ lệnh trực tiếp):</b> <code>/deploy &lt;file.zip&gt; [vps|vercel]</code>\n\n` +
+          `<b>Cách 2 (Gõ lệnh trực tiếp):</b> <code>/deploy &lt;file.zip&gt;</code>\n\n` +
           `<b>Ví dụ:</b> <code>/deploy my-portfolio.zip vps</code>`
         );
         return;

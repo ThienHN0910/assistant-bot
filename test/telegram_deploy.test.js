@@ -4,6 +4,8 @@ const path = require('path');
 const { createTextHandler, GITHUB_REPO_REGEX } = require('../handlers/textHandler');
 const deployStore = require('../lib/deployStore');
 const deployCommand = require('../commands/deploy');
+const deployWebCommand = require('../commands/deploy_web');
+const deployer = require('../lib/deployer');
 
 async function testTelegramDeploy() {
   const testRoot = path.join(__dirname, 'test_telegram_env');
@@ -47,7 +49,7 @@ async function testTelegramDeploy() {
       timezone: 'Asia/Ho_Chi_Minh',
     });
     await handlerNoKeys(mockCtxNoKeys);
-    assert(repliedHtml.includes('chưa cấu hình'), 'Should notify missing Vercel/Render tokens');
+    assert(repliedHtml.includes('tạm ẩn'), 'Should explain cloud deployments are temporarily hidden');
     console.log('✅ textHandler missing tokens notification test passed');
 
     // 4. Test createTextHandler with GitHub link and Vercel configured
@@ -66,6 +68,7 @@ async function testTelegramDeploy() {
       notesFilePath: notesPath,
       timezone: 'Asia/Ho_Chi_Minh',
       vercelToken: 'v-token',
+      cloudTargetsReady: true,
       baseDomain: 'thienhn.io.vn',
     });
     await handlerWithKeys(mockCtxWithKeys);
@@ -113,6 +116,29 @@ async function testTelegramDeploy() {
     assert(typeof deployCommand.execute === 'function');
     assert(typeof deployCommand.register === 'function');
     console.log('✅ deployCommand definition and register test passed');
+
+    const uploadDir = path.join(testRoot, 'uploads');
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.writeFile(path.join(uploadDir, 'site.zip'), 'fixture');
+    const replies = [];
+    const originalDeploy = deployer.deploy;
+    let received = null;
+    try {
+      deployer.deploy = async (input) => {
+        received = input;
+        return { ok: true, deployment: { name: 'test', domain: 'test.thienhn.io.vn', url: 'https://test.thienhn.io.vn', target: 'vps', type: 'static', port: null, status: 'online' } };
+      };
+      await deployWebCommand.execute({
+        message: { text: '/deploy_web test site.zip' },
+        replyWithHTML: async (message) => { replies.push(message); },
+      }, { uploadDir });
+      assert.strictEqual(received.projectName, 'test');
+      assert.strictEqual(received.target, 'vps');
+      assert(replies.some((message) => message.includes('https://test.thienhn.io.vn')));
+      assert(replies.every((message) => !message.includes(':8081')));
+    } finally {
+      deployer.deploy = originalDeploy;
+    }
   } finally {
     await fs.rm(testRoot, { recursive: true, force: true }).catch(() => {});
   }
