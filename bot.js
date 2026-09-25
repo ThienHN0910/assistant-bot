@@ -93,8 +93,12 @@ async function startBot() {
     // Kích hoạt Web Dashboard API Server (chạy trước bot.launch để đảm bảo luôn mở cổng 3001)
     startDashboardServer(config);
 
-    // Kích hoạt service giám sát tự động (watchdog)
-    startWatchdog(bot, config);
+    // Kích hoạt service giám sát tự động (watchdog) nếu được cấu hình
+    if (config.enableWatchdog !== false) {
+      startWatchdog(bot, config);
+    } else {
+      console.log("🛡️ Watchdog service đã tắt theo cấu hình ENABLE_WATCHDOG=false.");
+    }
 
     // Khởi động bot Telegram bất đồng bộ (tránh block event loop vì bot.launch giữ promise)
     bot.launch({ dropPendingUpdates: true })

@@ -57,6 +57,9 @@ function getConfig() {
   // IP Public của VPS (Tùy chọn, nếu không điền bot sẽ tự động nhận diện)
   const vpsPublicIp = (process.env.VPS_PUBLIC_IP || '').trim();
 
+  // Bật/tắt service cảnh báo tài nguyên tự động (Watchdog)
+  const enableWatchdog = process.env.ENABLE_WATCHDOG !== 'false';
+
   return {
     botToken,
     authorizedTelegramId,
@@ -79,6 +82,7 @@ function getConfig() {
     sessionSecret,
     dashboardAllowedOrigin,
     dashboardPort,
+    enableWatchdog,
   };
 }
 

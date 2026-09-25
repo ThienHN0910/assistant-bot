@@ -58,17 +58,62 @@ async function testNotesCommand() {
 }
 
 async function testWatchdog() {
-  let sentMessage = null;
+  const { resetAlertState } = require('../services/watchdog');
+  resetAlertState();
+
+  const sentMessages = [];
   const mockBot = {
     telegram: {
-      sendMessage: async (chatId, msg) => { sentMessage = { chatId, msg }; },
+      sendMessage: async (chatId, msg) => {
+        sentMessages.push({ chatId, msg });
+      },
     },
   };
   const mockConfig = { authorizedTelegramId: 12345 };
 
-  // Should run check without throwing
-  await checkSystemHealth(mockBot, mockConfig);
-  console.log('✅ watchdog check test passed');
+  // 1. Bình thường: RAM dùng 85% nhưng available vẫn còn 180MB -> KHÔNG BÁO ĐỘNG
+  const normalSi = {
+    mem: async () => ({
+      total: 1000 * 1024 * 1024,
+      used: 850 * 1024 * 1024,
+      available: 180 * 1024 * 1024,
+    }),
+    fsSize: async () => [{ mount: '/', use: 50 }],
+    currentLoad: async () => ({ currentLoad: 20 }),
+  };
+
+  await checkSystemHealth(mockBot, mockConfig, { si: normalSi });
+  assert.strictEqual(sentMessages.length, 0, 'Normal 85% RAM with 180MB available should NOT trigger false alarm');
+
+  // 2. Nguy cấp: RAM available tụt xuống dưới 60MB -> Báo động LẦN 1
+  const criticalRamSi = {
+    mem: async () => ({
+      total: 1000 * 1024 * 1024,
+      used: 960 * 1024 * 1024,
+      available: 40 * 1024 * 1024,
+    }),
+    fsSize: async () => [{ mount: '/', use: 50 }],
+    currentLoad: async () => ({ currentLoad: 20 }),
+  };
+
+  await checkSystemHealth(mockBot, mockConfig, { si: criticalRamSi });
+  assert.strictEqual(sentMessages.length, 1, 'Critical RAM should trigger exactly 1 alert');
+  assert(sentMessages[0].msg.includes('RAM CẠN KIỆT'), 'Message should indicate critical RAM');
+
+  // 3. Chu kỳ tiếp theo vẫn nguy cấp: KHÔNG GỬI LẶP LẠI (Chống spam)
+  await checkSystemHealth(mockBot, mockConfig, { si: criticalRamSi });
+  assert.strictEqual(sentMessages.length, 1, 'Subsequent check with same critical state should NOT repeat alert');
+
+  // 4. Hồi phục: RAM available tăng lại trên 120MB -> Gửi thông báo HỒI PHỤC 1 lần
+  await checkSystemHealth(mockBot, mockConfig, { si: normalSi });
+  assert.strictEqual(sentMessages.length, 2, 'Recovery should trigger recovery message');
+  assert(sentMessages[1].msg.includes('HỆ THỐNG ĐÃ ỔN ĐỊNH TRỞ LẠI'), 'Message should announce recovery');
+
+  // 5. Chu kỳ tiếp theo vẫn bình thường: KHÔNG gửi thêm tin nhắn
+  await checkSystemHealth(mockBot, mockConfig, { si: normalSi });
+  assert.strictEqual(sentMessages.length, 2, 'Stable state should not produce new messages');
+
+  console.log('✅ watchdog edge-triggered & recovery tests passed');
 }
 
 async function run() {
