@@ -4,8 +4,8 @@
 [![Blog](https://img.shields.io/badge/Blog-VPS_Orchestration-orange?style=flat-square)](https://thienhn.io.vn/blog/zero-overhead-vps-orchestration-telegram-bot-pm2-nginx)
 [![Author](https://img.shields.io/badge/Author-ThienHN-4FC08D?style=flat-square)](https://thienhn.io.vn/)
 
-Telegram Dev Assistant & Web Sandbox Suite cho lập trình viên, xây dựng bằng Node.js và Telegraf.  
-Được tối ưu hóa đặc biệt cho máy chủ cấu hình thấp (GCP 1 vCPU / 1 GB RAM e2-micro/f1-micro) chạy dưới sự quản lý của PM2.  
+Telegram Dev Assistant & Multi-Target Deployment Suite cho lập trình viên, xây dựng bằng Node.js, Telegraf và Vue 3.  
+Được thiết kế theo kiến trúc **Zero-Overhead** tối ưu hóa chuyên biệt cho máy chủ cấu hình thấp (GCP 1 vCPU / 1 GB RAM e2-micro/f1-micro) với giới hạn RAM nghiêm ngặt (200MB) và cơ chế tự động hóa DNS Cloudflare toàn diện.  
 Dự án được phát triển và lưu trữ trong portfolio kỹ thuật của [ThienHN](https://thienhn.io.vn/).
 
 ---
@@ -13,85 +13,175 @@ Dự án được phát triển và lưu trữ trong portfolio kỹ thuật củ
 ## 🌟 Tính năng chính
 
 ### 1. 🖥️ Quản trị hệ thống & Giám sát (Host Health Suite)
-- `/status`: Báo cáo thời gian thực về CPU (%), RAM (dùng/tổng), SWAP, và dung lượng đĩa trống (`/`).
+- `/status`: Báo cáo thời gian thực về CPU (%), RAM (dùng/tổng), SWAP, Load Average và dung lượng đĩa trống (`/`).
 - `/ps`: Top 5 tiến trình ngốn RAM & CPU nhiều nhất server (chẩn đoán nhanh tiến trình gây nghẽn/OOM).
 - `/uptime`: Xem thời gian máy chủ đã hoạt động liên tục và thời điểm boot server.
-- `/ip`: Lấy địa chỉ IP Public hiện tại của server.
+- `/ip`: Lấy địa chỉ IP Public hiện tại của server (hỗ trợ kiểm tra qua API ifconfig/ipify).
 - `/logs`: Đọc 20 dòng log lỗi PM2 gần nhất bằng cơ chế `tail -n 20` **miễn nhiễm OOM** (tiêu thụ 0 MB RAM).
 - `/cleancache`: Xả RAM đệm an toàn và dọn sạch lịch sử log cũ của PM2 (`pm2 flush`).
-- `/restart`: Khởi động lại bot từ xa qua PM2 an toàn (gửi phản hồi trước khi restart).
+- `/restart`: Khởi động lại bot từ xa qua PM2 an toàn kèm cờ giới hạn bộ nhớ `--max-memory-restart 200M`.
+- `/update`: Tự động kéo mã nguồn mới nhất (`git pull`), cập nhật thư viện `npm` nếu cần, kiểm tra cú pháp và khởi động lại PM2 với trần 200MB RAM.
 - `/notes`: Xem 10 dòng ghi chú gần nhất đã lưu (hoặc `/notes clear` để dọn dẹp file ghi chú).
 - 🚨 **Background Watchdog**: Worker chạy nền định kỳ 5 phút tự động ping báo động Telegram khi **RAM > 85%** hoặc **Disk > 90%** (có cooldown 30 phút chống spam).
 
-### 2. 🚀 Web Sandbox & Deploy 1 chạm (Interactive Web Deploy)
-- `/deploy`: Tự động quét file `.zip` từ thư mục upload (`~` hoặc `~/uploads`), hiển thị **Inline Buttons** trên Telegram.
-- **Nhận diện thông minh**:
-  - **Web tĩnh / SPA** (React, Vue, Vite, HTML/CSS): Nginx phục vụ trực tiếp qua HTTPS subdomain, không cấp port ứng dụng.
-  - **Node.js Backend**: Tự chạy `npm install --omit=dev`, bật tiến trình con qua PM2 và cấu hình Nginx reverse proxy.
-- **Backend Node.js**: Port chỉ dùng nội bộ localhost phía sau Nginx; URL công khai luôn dùng subdomain HTTPS.
-- `/deploy_web <project> <file.zip>`: Triển khai ZIP lên VPS qua cùng luồng với `/deploy`.
-- Vercel/Render tạm ẩn khỏi luồng deploy cho đến khi provider xác nhận website thật sự sẵn sàng; xóa deployment cloud cũ vẫn hoạt động (issue #36).
-- `/web_list`: Xem danh sách web, trạng thái, dung lượng đĩa và URL HTTPS.
-- `/web_remove <name>`: Gỡ bỏ web và bản ghi DNS thuộc deployment; lỗi được giữ để thử lại.
+### 2. 🚀 Bộ công cụ triển khai đa nền tảng (Multi-Target Deployment Suite)
+Hỗ trợ triển khai ứng dụng linh hoạt qua cả **Telegram Bot (1 chạm)** và **Web Dashboard**:
 
-### 3. ⚡ Đo đạc hiệu năng (Performance Benchmarking)
+- **Nguồn triển khai (Deployment Sources)**:
+  - 📦 **File ZIP Upload** (`/deploy`): Quét file `.zip` từ thư mục uploads hoặc gửi trực tiếp.
+  - 🐙 **Public GitHub Repository**: Dán link GitHub public trực tiếp vào Telegram hoặc Dashboard.
+- **Bộ nhận diện kho lưu trữ thông minh (Smart Repo Inspector)**:
+  - **Web tĩnh thuần (`static_pure`)**: Trang HTML/CSS/JS không yêu cầu build -> Triển khai trực tiếp lên VPS Nginx. Không chạy `git clone` nặng đĩa, sử dụng GitHub zipball nhẹ và tự động làm phẳng (flatten) thư mục.
+  - **Frontend SPA (`frontend_spa`)**: Dự án React, Vue, Vite, Next.js -> Triển khai lên Vercel Cloud để bảo toàn RAM cho VPS.
+  - **Backend API (`backend_api`)**: Node.js/Express -> Triển khai lên Render hoặc VPS (quản lý PM2 nội bộ cổng riêng).
+  - **Monorepo (`monorepo`)**: Tự động nhận diện cấu trúc Frontend + Backend -> Triển khai song song Frontend lên Vercel và Backend lên Render.
+- **Tự động hóa Cloudflare DNS (Subdomain Routing)**:
+  - Tự động tạo subdomain dạng `<project>.thienhn.io.vn`.
+  - Tự động cấu hình **Bản ghi A** trỏ về IP VPS đối với ứng dụng host trên máy chủ.
+  - Tự động cấu hình **Bản ghi CNAME** trỏ về `cname.vercel-dns.com` (Vercel) hoặc Render.
+  - Tự động thu hồi bản ghi DNS khi gỡ bỏ dự án qua `/web_remove` hoặc Dashboard.
+- **Quản lý vòng đời dịch vụ**:
+  - `/web_list`: Xem danh sách toàn bộ dự án đang chạy (cả VPS, Vercel, Render), URL HTTPS và trạng thái.
+  - `/web_remove <name>`: Gỡ bỏ web, giải phóng thư mục/tiến trình PM2 và xóa bản ghi Cloudflare DNS.
+
+### 3. 📊 Web Dashboard điều khiển trung tâm (Vue 3 + Google OAuth)
+- Giao diện trực quan hiện đại xây dựng bằng Vue 3 + Tailwind CSS, phục vụ tại `bot.thienhn.io.vn`.
+- **Giám sát thời gian thực**: Trực quan hóa CPU, RAM, Disk, Uptime và trạng thái tiến trình PM2.
+- **Bảng điều khiển Deployment**: Quản lý toàn bộ ứng dụng đã triển khai, huy hiệu phân loại nền tảng (VPS / Vercel / Render), đường dẫn truy cập và nút xóa (Undeploy) nhanh.
+- **Modal Triển khai GitHub**: Phân tích trực tiếp cấu trúc repository từ GitHub URL, gợi ý nền tảng tối ưu và cho phép tùy biến subdomain trước khi deploy.
+- **Bảo mật Google OAuth 2.0**: Chỉ duy nhất email được định danh trong `AUTHORIZED_GOOGLE_EMAIL` mới có quyền truy cập dashboard và thực thi API.
+
+### 4. ⚡ Đo đạc hiệu năng (Performance Benchmarking)
 - `/perf <name | domain | url>`:
   - **Đo độ trễ tại chỗ qua `curl -w` (0 MB RAM)**: Phân rã chi tiết thời gian phản hồi: DNS Lookup, TCP Connect, **TTFB (Time To First Byte)**, Total Duration, Size.
   - **Tích hợp Google PageSpeed Insights API**: Gọi API Google từ xa để chấm điểm Lighthouse Mobile (Score, FCP, LCP, TBT, CLS) mà không tốn 1MB RAM nào của VPS.
 
-### 4. 🔒 Bảo mật & An toàn (Zero-Leakage Security)
-- **Middleware lọc ID**: Chỉ duy nhất `AUTHORIZED_TELEGRAM_ID` mới có quyền gửi lệnh và tương tác với bot.
-- `/sh`: Thực thi lệnh shell giới hạn nghiêm ngặt theo danh mục whitelist (`config/whitelist.js`).
+### 5. 🔒 Bảo mật & An toàn tài nguyên (Zero-Leakage Security & RAM Ceiling)
+- **Kiểm soát truy cập nghiêm ngặt**:
+  - Telegram ID whitelist (`AUTHORIZED_TELEGRAM_ID`) cho mọi tương tác bot.
+  - Google OAuth whitelist (`AUTHORIZED_GOOGLE_EMAIL`) cho Web Dashboard.
+  - Lệnh shell `/sh` giới hạn nghiêm ngặt theo danh mục an toàn (`config/whitelist.js`).
+- **Trần giới hạn bộ nhớ (200MB RAM Ceiling)**:
+  - Cấu hình `--max-memory-restart 200M` cho PM2 đảm bảo tiến trình tự động khởi động lại nếu vượt ngưỡng bộ nhớ, triệt tiêu nguy cơ OOM trên máy chủ cấu hình thấp.
+- **An toàn chứng chỉ & Biến môi trường**:
+  - Toàn bộ thông tin nhạy cảm lưu độc quyền trong `.env`, không ghi log hay phản hồi token/key ra giao diện.
 
 ---
 
 ## ⚙️ Biến môi trường (.env)
 
-Tham khảo file [`.env.example`](.env.example):
+Tham khảo mẫu hoàn chỉnh tại [`.env.example`](.env.example):
 
-| Biến | Ý nghĩa | Mặc định / Ví dụ |
-| :--- | :--- | :--- |
-| `BOT_TOKEN` | Token Telegram bot lấy từ @BotFather | *(Bắt buộc)* |
-| `AUTHORIZED_TELEGRAM_ID` | Telegram user ID được phép điều khiển bot | *(Bắt buộc)* |
-| `PM2_ERROR_LOG_PATH` | Đường dẫn file error log của PM2 | `/home/hnt/.pm2/logs/assistant-bot-error.log` |
-| `TIMEZONE` | Múi giờ ghi nhận timestamp ghi chú | `Asia/Ho_Chi_Minh` |
-| `NOTES_FILE_PATH` | Đường dẫn file ghi chú cục bộ | `./notes.txt` |
-| `PM2_PROCESS_NAME` | Tên tiến trình PM2 của bot | `assistant-bot` |
-| `WEB_DEPLOY_DIR` | Thư mục chứa các web sandbox | `/home/hnt/web` |
-| `UPLOAD_DIR` | Thư mục nhận file zip upload | `/home/hnt/uploads` |
-| `WEB_PORT_START` | Port localhost khởi đầu cho backend Node.js | `8081` |
-| `PAGESPEED_API_KEY` | API Key Google PageSpeed Insights | *(Tuỳ chọn)* |
+| Biến | Mục đích | Bắt buộc | Mặc định / Ví dụ |
+| :--- | :--- | :---: | :--- |
+| `BOT_TOKEN` | Token Telegram bot cấp bởi @BotFather | Có | `123456789:ABC...` |
+| `AUTHORIZED_TELEGRAM_ID` | Telegram User ID duy nhất được điều khiển bot | Có | `123456789` |
+| `BASE_DOMAIN` | Tên miền gốc quản lý trên Cloudflare | Có | `thienhn.io.vn` |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token (quyền `Zone.DNS:Edit`) | Có | *(API Token Cloudflare)* |
+| `CLOUDFLARE_ZONE_ID` | Zone ID của tên miền trên Cloudflare | Có | *(Zone ID 32 ký tự)* |
+| `VPS_PUBLIC_IP` | IP Public của máy chủ VPS (để tạo DNS bản ghi A) | Không | Tự động phát hiện qua API |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID cho Web Dashboard | Có (Dashboard) | `*.apps.googleusercontent.com` |
+| `AUTHORIZED_GOOGLE_EMAIL` | Email Google duy nhất được phép đăng nhập Dashboard | Có (Dashboard) | `your_email@gmail.com` |
+| `SESSION_SECRET` | Khóa bí mật ký token phiên làm việc Dashboard | Có (Dashboard) | *(Chuỗi ngẫu nhiên dài)* |
+| `DASHBOARD_PORT` | Cổng HTTP nội bộ của Dashboard API (localhost) | Không | `3001` |
+| `VERCEL_TOKEN` | Personal Access Token của Vercel (deploy Vercel) | Không | *(Vercel Token)* |
+| `RENDER_API_KEY` | API Key của Render (deploy Render) | Không | `rnd_*` |
+| `RENDER_OWNER_ID` | Owner / Team ID của Render | Không | `usr_*` |
+| `PM2_PROCESS_NAME` | Tên tiến trình PM2 của bot | Không | `assistant-bot` |
+| `WEB_DEPLOY_DIR` | Thư mục lưu mã nguồn web deploy trên VPS | Không | `/home/hnt/web` |
+| `UPLOAD_DIR` | Thư mục nhận file zip upload | Không | `/home/hnt/uploads` |
+| `PAGESPEED_API_KEY` | Google PageSpeed Insights API Key cho lệnh `/perf` | Không | *(Google API Key)* |
 
 ---
 
 ## 🛠️ Cài đặt & Vận hành
 
-### 1. Cài đặt trên server
+### 1. Yêu cầu hệ thống
+- Hệ điều hành: Linux (Ubuntu 20.04/22.04 LTS hoặc Debian)
+- Node.js: `>= 18.0.0`
+- Nginx, PM2, tar / unzip, curl
+
+### 2. Cài đặt trên máy chủ VPS
 ```bash
+# 1. Clone repository về thư mục ứng dụng
 git clone https://github.com/ThienHN0910/assistant-bot.git app
 cd app
+
+# 2. Cài đặt các gói phụ thuộc (chế độ production tiết kiệm RAM)
 npm install --omit=dev
+
+# 3. Tạo file cấu hình môi trường
 cp .env.example .env
-nano .env # điền token và authorized id
-pm2 start bot.js --name assistant-bot
+nano .env # Điền các biến môi trường cần thiết
+
+# 4. Khởi chạy Bot với trần RAM 200MB qua PM2
+pm2 start bot.js --name assistant-bot --max-memory-restart 200M
 pm2 save
 ```
 
-### 2. Kiểm thử & Đảm bảo chất lượng (Verification Gate)
+### 3. Cấu hình Nginx Reverse Proxy cho Dashboard
+Tạo file `/etc/nginx/sites-available/web-dashboard.conf`:
+```nginx
+# 1. Chuyển hướng HTTP sang HTTPS
+server {
+    listen 80;
+    server_name bot.thienhn.io.vn;
+    return 301 https://$host$request_uri;
+}
+
+# 2. Phục vụ Dashboard và Proxy API
+server {
+    listen 443 ssl;
+    server_name bot.thienhn.io.vn;
+
+    ssl_certificate /etc/ssl/certs/cloudflare_cert.pem;
+    ssl_certificate_key /etc/ssl/private/cloudflare_key.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    root /home/hnt/app/dashboard;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
+}
+```
+Kích hoạt cấu hình:
+```bash
+sudo ln -sf /etc/nginx/sites-available/web-dashboard.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### 4. Kiểm thử & Đảm bảo chất lượng (Verification Gate)
 ```bash
 # Kiểm tra cú pháp toàn bộ file mã nguồn
 npm run check:syntax
 
-# Chạy toàn bộ test suites
+# Chạy toàn bộ 16 test suites tự động
 npm test
 ```
 
-### 3. Cập nhật mã nguồn tự động
-Trên Telegram, chỉ cần gõ:
+### 5. Cập nhật mã nguồn tự động
+Trên Telegram, chỉ cần gõ lệnh:
 ```
 /update
 ```
-Bot sẽ tự động `git pull origin main`, cài gói thư viện và restart tiến trình PM2.
+Bot sẽ tự động thực hiện: `git pull origin main` ➔ `npm install` ➔ kiểm tra cú pháp ➔ khởi động lại PM2 với giới hạn bộ nhớ 200MB.
 
 ---
 
@@ -99,53 +189,53 @@ Bot sẽ tự động `git pull origin main`, cài gói thư viện và restart 
 
 ```text
 assistant-bot/
-├── bot.js                  # Điểm khởi động chính, nạp command và khởi tạo Watchdog
-├── commands/               # Các mô-đun lệnh bot độc lập
-│   ├── cleancache.js       # Xả RAM cache và pm2 flush
-│   ├── deploy.js           # Deploy web tương tác qua file ZIP và inline keyboard
-│   ├── deploy_web.js       # Alias ZIP deploy trên VPS
-│   ├── ip.js               # Lấy IP public server
-│   ├── logs.js             # Đọc log lỗi PM2 an toàn (OOM-safe tail)
-│   ├── notes.js            # Xem và xóa ghi chú
-│   ├── perf.js             # Đo đạc độ trễ TTFB và PageSpeed
-│   ├── ps.js               # Top 5 tiến trình ngốn RAM/CPU
-│   ├── restart.js          # Khởi động lại bot an toàn qua PM2
-│   ├── sh.js               # Chạy shell theo whitelist an toàn
-│   ├── start.js            # Menu hướng dẫn và reply keyboard
-│   ├── status.js           # Báo cáo phần cứng thời gian thực
-│   ├── update.js           # Tự động cập nhật code từ GitHub
-│   ├── uptime.js           # Thời gian hoạt động liên tục của server
-│   ├── web_list.js         # Liệt kê danh sách các web đang host
-│   └── web_remove.js       # Gỡ bỏ web test và giải phóng tài nguyên
-├── config/
-│   ├── env.js              # Nạp và kiểm định biến môi trường
-│   ├── middleware.js       # Middleware kiểm soát quyền truy cập ID
-│   ├── utils.js            # Tiện ích định dạng, escape HTML và OOM-safe tailing
-│   └── whitelist.js        # Cấu hình danh mục lệnh shell được phép
-├── handlers/
-│   └── textHandler.js      # Bắt tin nhắn text thường để lưu ghi chú
-├── lib/
-│   ├── perf.js             # Đo độ trễ HTTP bằng curl/node & PageSpeed API
-│   ├── runner.js           # Bộ thực thi child_process an toàn
-│   ├── sandbox.js          # Quản lý vòng đời web deploy, unzipping, Nginx & PM2
-│   └── whitelist.js        # Logic xử lý alias whitelist
-├── services/
-│   └── watchdog.js         # Service giám sát RAM/Disk định kỳ 5 phút
-├── test/                   # Toàn bộ test suites
-│   ├── monitoring.test.js
-│   ├── perf.test.js
-│   ├── sandbox.test.js
-│   ├── utils.test.js
-│   └── whitelist.test.js
-├── docs/                   # Tài liệu chi tiết & agent skills config
-│   ├── agents/
-│   ├── commands-guide.md
-│   ├── feature-matrix.md
-│   ├── shell-maintenance-spec.md
-│   └── whitelist.md
-├── .env.example
-├── .gitignore
-├── AGENTS.md
+├── bot.js                      # Điểm khởi động chính, nạp lệnh, handlers và Dashboard API
+├── dashboard/                  # Giao diện Web Dashboard
+│   └── index.html              # Ứng dụng Single Page Vue 3 + Tailwind CSS + Google OAuth
+├── commands/                   # Các mô-đun lệnh Telegram độc lập
+│   ├── cleancache.js           # Xả RAM cache và pm2 flush
+│   ├── deploy.js               # Deploy web tương tác (ZIP & GitHub) kèm inline buttons
+│   ├── deploy_web.js           # Alias deploy VPS trực tiếp
+│   ├── ip.js                   # Lấy IP public của server
+│   ├── logs.js                 # Đọc log lỗi PM2 an toàn (OOM-safe tail)
+│   ├── notes.js                # Quản lý ghi chú nhanh
+│   ├── perf.js                 # Đo độ trễ TTFB và điểm Google PageSpeed
+│   ├── ps.js                   # Top 5 tiến trình ngốn RAM & CPU
+│   ├── restart.js              # Khởi động lại bot qua PM2 (giới hạn 200MB RAM)
+│   ├── sh.js                   # Thực thi shell an toàn theo whitelist
+│   ├── start.js                # Menu hướng dẫn sử dụng bot
+│   ├── status.js               # Báo cáo phần cứng thời gian thực
+│   ├── update.js               # Tự động cập nhật bot từ GitHub và restart PM2
+│   ├── uptime.js               # Xem thời gian hoạt động liên tục của VPS
+│   ├── web_list.js             # Liệt kê danh sách các web đang hoạt động
+│   └── web_remove.js           # Gỡ bỏ web, giải phóng tài nguyên và DNS
+├── config/                     # Cấu hình & tiện ích lõi
+│   ├── env.js                  # Nạp và kiểm định biến môi trường nghiêm ngặt
+│   ├── middleware.js           # Middleware kiểm soát quyền truy cập Telegram ID
+│   ├── utils.js                # Tiện ích định dạng, escape HTML và OOM-safe tailing
+│   └── whitelist.js            # Danh mục lệnh shell được phép thực thi
+├── handlers/                   # Bộ xử lý tương tác người dùng
+│   └── textHandler.js          # Nhận diện link GitHub tự động và tiếp nhận ghi chú
+├── lib/                        # Thư viện dịch vụ lõi
+│   ├── deployer.js             # Điều phối triển khai (Orchestrator: VPS, Vercel, Render)
+│   ├── deployStore.js          # Quản lý trạng thái chờ xác nhận deploy tạm thời
+│   ├── perf.js                 # Đo đạc HTTP TTFB và tích hợp PageSpeed Insights API
+│   ├── repoInspector.js        # Phân tích cấu trúc repository GitHub (Pure Static, SPA, Backend, Monorepo)
+│   ├── runner.js               # Thực thi command an toàn
+│   ├── sandbox.js              # Quản lý vòng đời web VPS, giải nén ZIP, cấu hình Nginx
+│   ├── whitelist.js            # Kiểm tra alias lệnh shell
+│   └── providers/              # Adapter tích hợp các nhà cung cấp bên ngoài
+│       ├── cloudflare.js       # Tự động hóa bản ghi DNS Cloudflare (Type A & CNAME)
+│       ├── render.js           # Adapter triển khai dịch vụ lên Render Cloud
+│       └── vercel.js           # Adapter triển khai ứng dụng lên Vercel Cloud
+├── services/                   # Các dịch vụ nền
+│   ├── dashboardApi.js         # REST API phục vụ Web Dashboard & xác thực Google OAuth
+│   └── watchdog.js             # Service giám sát RAM/Disk định kỳ 5 phút
+├── test/                       # 16 test suites kiểm thử tự động
+├── docs/                       # Tài liệu hướng dẫn & đặc tả kỹ thuật
+├── .env.example                # File cấu hình mẫu đã được vệ sinh thông tin nhạy cảm
+├── AGENTS.md                   # Hướng dẫn và quy chuẩn vận hành cho AI Agents
+├── CONTEXT.md                  # Từ vựng nghiệp vụ chuẩn (Domain Glossary)
 ├── package.json
 └── README.md
 ```
