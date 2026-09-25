@@ -92,7 +92,7 @@ module.exports = {
           setTimeout(() => {
             const execFn = deps.exec || require('child_process').exec;
             const processName = process.env.PM2_PROCESS_NAME || config?.pm2ProcessName || 'assistant-bot';
-            execFn(`pm2 restart ${processName}`, (err) => {
+            execFn(`pm2 restart ${processName} --update-env --max-memory-restart 200M`, (err) => {
               if (err) console.error('[PM2_RESTART_ERROR]', err);
             });
           }, restartDelay);

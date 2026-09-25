@@ -460,7 +460,19 @@
             logout();
             throw new Error('Hết phiên làm việc hoặc chưa xác thực');
           }
-          return res.json();
+
+          const rawText = await res.text();
+          let data;
+          try {
+            data = JSON.parse(rawText);
+          } catch (e) {
+            if (!res.ok) {
+              const cleanMsg = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 150);
+              throw new Error(`Lỗi máy chủ (HTTP ${res.status}): ${cleanMsg || res.statusText || 'Phản hồi không hợp lệ'}`);
+            }
+            throw new Error(`Phản hồi không phải JSON: ${rawText.slice(0, 100)}`);
+          }
+          return data;
         }
 
         async function initGoogleAuth() {

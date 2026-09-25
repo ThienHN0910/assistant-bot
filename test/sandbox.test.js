@@ -160,6 +160,30 @@ async function testSandbox() {
     const remaining = await sandbox.listDeployments(webDir);
     assert.strictEqual(remaining.length, 0, 'Deployments should be empty after removal');
     console.log('✅ sandbox removeProject test passed');
+
+    // 7. Test deployProject with single wrapper directory (GitHub zipball simulation)
+    const wrapperZipDir = path.join(testRoot, 'wrapper_source');
+    const innerDir = path.join(wrapperZipDir, 'ThienHN0910-repo-38827fa');
+    await fs.mkdir(innerDir, { recursive: true });
+    await fs.writeFile(path.join(innerDir, 'index.html'), '<html><body>Hello GitHub</body></html>', 'utf8');
+    await fs.writeFile(path.join(innerDir, 'style.css'), 'body { color: blue; }', 'utf8');
+    const githubZipPath = path.join(uploadDir, 'github_repo.zip');
+
+    const { execFile } = require('child_process');
+    const { promisify } = require('util');
+    const execFileAsync = promisify(execFile);
+    if (process.platform === 'win32') {
+      await execFileAsync('tar', ['-cf', githubZipPath, '-C', wrapperZipDir, '.']);
+    } else {
+      await execFileAsync('zip', ['-r', githubZipPath, '.'], { cwd: wrapperZipDir });
+    }
+
+    const ghDeployRes = await sandbox.deployProject(githubZipPath, 'ghapp', null, { webDeployDir: webDir, baseDomain: 'thienhn.io.vn' });
+    assert.strictEqual(ghDeployRes.ok, true);
+    assert.strictEqual(ghDeployRes.type, 'static');
+    const deployedIndexPath = path.join(webDir, 'ghapp', 'index.html');
+    assert.strictEqual(require('fs').existsSync(deployedIndexPath), true, 'index.html should be flattened to root of deployed app');
+    console.log('✅ sandbox deployProject wrapper flattening test passed');
   } finally {
     await fs.rm(testRoot, { recursive: true, force: true }).catch(() => {});
   }
