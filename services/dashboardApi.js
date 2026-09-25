@@ -39,32 +39,39 @@ function parseJsonBody(req) {
 }
 
 function createSessionToken(email, secret) {
+  if (!secret) throw new Error('Dashboard session secret is required');
   const payload = {
     email: (email || '').toLowerCase().trim(),
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days expiration
   };
   const dataStr = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = crypto.createHmac('sha256', secret || 'default-salt').update(dataStr).digest('base64url');
+  const signature = crypto.createHmac('sha256', secret).update(dataStr).digest('base64url');
   return `${dataStr}.${signature}`;
 }
 
 function verifySessionToken(token, secret, authorizedEmail) {
-  if (!token || typeof token !== 'string') return null;
+  if (!token || typeof token !== 'string' || !secret || !authorizedEmail) return null;
   const parts = token.split('.');
   if (parts.length !== 2) return null;
 
   const [dataStr, signature] = parts;
-  const expectedSig = crypto.createHmac('sha256', secret || 'default-salt').update(dataStr).digest('base64url');
-  if (signature !== expectedSig) return null;
+  const expectedSig = crypto.createHmac('sha256', secret).update(dataStr).digest('base64url');
+  const actualBytes = Buffer.from(signature, 'utf8');
+  const expectedBytes = Buffer.from(expectedSig, 'utf8');
+  if (actualBytes.length !== expectedBytes.length || !crypto.timingSafeEqual(actualBytes, expectedBytes)) return null;
 
   try {
     const payload = JSON.parse(Buffer.from(dataStr, 'base64url').toString('utf8'));
-    if (payload.exp && Date.now() > payload.exp) return null;
-    if (authorizedEmail && payload.email !== authorizedEmail.toLowerCase().trim()) return null;
+    if (!Number.isFinite(payload.exp) || payload.exp <= Date.now()) return null;
+    if (payload.email !== authorizedEmail.toLowerCase().trim()) return null;
     return payload;
   } catch {
     return null;
   }
+}
+
+function isDashboardAuthReady(config) {
+  return Boolean(config?.authorizedGoogleEmail && config?.googleClientId && config?.sessionSecret);
 }
 
 async function verifyGoogleIdToken(idToken, client = axios) {
@@ -98,10 +105,7 @@ async function verifyGoogleIdToken(idToken, client = axios) {
 }
 
 function checkAuth(req, config) {
-  // If no authorized email configured in dev, allow access
-  if (!config.authorizedGoogleEmail) {
-    return true;
-  }
+  if (!isDashboardAuthReady(config)) return false;
 
   const authHeader = req.headers.authorization || '';
   if (authHeader.startsWith('Bearer ')) {
@@ -150,6 +154,10 @@ function createDashboardServer(config, deps = {}) {
     // 3. Google Sign-In Authentication Endpoint
     if (pathname === '/api/auth/google' && req.method === 'POST') {
       try {
+        if (!isDashboardAuthReady(config)) {
+          sendJson(res, 503, { ok: false, error: 'Dashboard authentication is not configured' });
+          return;
+        }
         const body = await parseJsonBody(req);
         const credential = body.credential || body.id_token;
 
@@ -164,9 +172,14 @@ function createDashboardServer(config, deps = {}) {
           return;
         }
 
+        if (!verifyRes.emailVerified) {
+          sendJson(res, 403, { ok: false, error: 'Google email is not verified' });
+          return;
+        }
+
         // Verify authorized email
         const targetEmail = (config.authorizedGoogleEmail || '').toLowerCase().trim();
-        if (targetEmail && verifyRes.email !== targetEmail) {
+        if (verifyRes.email !== targetEmail) {
           sendJson(res, 403, {
             ok: false,
             error: `Tài khoản Google (${verifyRes.email}) không có quyền truy cập hệ thống.`,
@@ -175,7 +188,7 @@ function createDashboardServer(config, deps = {}) {
         }
 
         // Verify Google Client ID if configured
-        if (config.googleClientId && verifyRes.aud && verifyRes.aud !== config.googleClientId) {
+        if (verifyRes.aud !== config.googleClientId) {
           sendJson(res, 403, {
             ok: false,
             error: 'Google Client ID không khớp với cấu hình hệ thống.',
@@ -313,6 +326,7 @@ function stopDashboardServer() {
 }
 
 module.exports = {
+  isDashboardAuthReady,
   createSessionToken,
   verifySessionToken,
   verifyGoogleIdToken,

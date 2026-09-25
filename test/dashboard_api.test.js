@@ -2,6 +2,7 @@ const assert = require('assert');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs/promises');
+const crypto = require('crypto');
 const {
   createDashboardServer,
   createSessionToken,
@@ -59,6 +60,15 @@ async function testDashboardApi() {
           },
         };
       }
+      if (url.includes('token=unverified-admin-token')) {
+        return { data: { email: authorizedEmail, email_verified: false, aud: googleClientId } };
+      }
+      if (url.includes('token=missing-audience-token')) {
+        return { data: { email: authorizedEmail, email_verified: true } };
+      }
+      if (url.includes('token=wrong-audience-token')) {
+        return { data: { email: authorizedEmail, email_verified: true, aud: 'other-client-id' } };
+      }
       const err = new Error('Invalid token');
       err.response = { data: { error_description: 'Token invalid' } };
       throw err;
@@ -74,8 +84,31 @@ async function testDashboardApi() {
   });
 
   try {
+    const missingConfigServer = createDashboardServer({ deployRegistryPath: registryPath }, { axios: mockHttpClient });
+    await new Promise((resolve) => missingConfigServer.listen(0, '127.0.0.1', resolve));
+    try {
+      const missingConfigClient = axios.create({
+        baseURL: `http://127.0.0.1:${missingConfigServer.address().port}`,
+        validateStatus: () => true,
+      });
+      const protectedRes = await missingConfigClient.get('/api/deployments');
+      assert.strictEqual(protectedRes.status, 401, 'Missing auth config must never open management endpoints');
+      const loginRes = await missingConfigClient.post('/api/auth/google', { credential: 'valid-admin-token' });
+      assert.strictEqual(loginRes.status, 503, 'Missing auth config must not issue a session');
+      assert.strictEqual(loginRes.data.token, undefined);
+    } finally {
+      await new Promise((resolve) => missingConfigServer.close(resolve));
+    }
+
     // 1. Session Token Unit Tests
+    assert.throws(() => createSessionToken(authorizedEmail, ''), /secret/i);
     const validToken = createSessionToken(authorizedEmail, sessionSecret);
+    assert.strictEqual(verifySessionToken(validToken, '', authorizedEmail), null);
+    assert.strictEqual(verifySessionToken(validToken, sessionSecret, ''), null);
+    assert.strictEqual(verifySessionToken('broken.' + validToken.split('.')[1], sessionSecret, authorizedEmail), null);
+    const expiredPayload = Buffer.from(JSON.stringify({ email: authorizedEmail, exp: 0 })).toString('base64url');
+    const expiredSignature = crypto.createHmac('sha256', sessionSecret).update(expiredPayload).digest('base64url');
+    assert.strictEqual(verifySessionToken(`${expiredPayload}.${expiredSignature}`, sessionSecret, authorizedEmail), null);
     const verified = verifySessionToken(validToken, sessionSecret, authorizedEmail);
     assert(verified, 'Session token should verify successfully');
     assert.strictEqual(verified.email, authorizedEmail);
@@ -111,6 +144,13 @@ async function testDashboardApi() {
     console.log('✅ dashboardApi /api/auth/google unauthorized email 403 test passed');
 
     // 6. Google Auth - Authorized email (200 OK + returns session token)
+    const unverifiedRes = await client.post('/api/auth/google', { credential: 'unverified-admin-token' });
+    assert.strictEqual(unverifiedRes.status, 403);
+    const missingAudienceRes = await client.post('/api/auth/google', { credential: 'missing-audience-token' });
+    assert.strictEqual(missingAudienceRes.status, 403);
+    const wrongAudienceRes = await client.post('/api/auth/google', { credential: 'wrong-audience-token' });
+    assert.strictEqual(wrongAudienceRes.status, 403);
+
     const adminRes = await client.post('/api/auth/google', { credential: 'valid-admin-token' });
     assert.strictEqual(adminRes.status, 200);
     assert.strictEqual(adminRes.data.ok, true);
