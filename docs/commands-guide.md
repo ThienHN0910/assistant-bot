@@ -144,25 +144,10 @@ Dưới đây là mô tả chi tiết của từng alias trong whitelist:
 | Tên Alias | Mô tả chức năng | Lệnh thực tế thực thi | Tham số / Ví dụ |
 | :--- | :--- | :--- | :--- |
 | **`git-status`** | Kiểm tra trạng thái Git hiện tại. | `git status` | `/sh /git-status` |
-| **`git-pull`** | Kéo code mới nhất từ nhánh chính. | `git pull origin main` | `/sh /git-pull` |
-| **`npm-install`**| Cài đặt các thư viện phụ thuộc. | `npm install` | `/sh /npm-install` |
-| **`npm-build`**  | Build dự án sang chế độ sản xuất. | `npm run build` | `/sh /npm-build` |
-| **`update`**     | Cập nhật mã nguồn và khởi động lại bot. | Chạy tuần tự: `git pull origin main` $\to$ `npm install` (sau đó tự động khởi động lại bot bất đồng bộ). | `/sh /update` *(Tương đương lệnh direct `/update`)* |
-| **`deploy-web`** | Triển khai website tĩnh/SPA trong 1 bước duy nhất (sử dụng script Bash). | Thực thi script `bash ./scripts/deploy-web.sh <project> <zip> <server>` tự động xử lý: tạo thư mục, chuyển zip, giải nén, chmod, tạo Virtual Host Nginx, tạo symlink, test và reload Nginx. | `/sh /deploy-web my-portfolio dist.zip mydomain.com`<br>*Tham số thứ tự: `[tên_project] [tên_file_zip] [tên_domain_hoặc_IP]` (Tương đương lệnh direct `/deploy_web`)* |
 | **`nginx-test`** | Kiểm tra cú pháp file cấu hình Nginx. | `sudo nginx -t` (yêu cầu quyền sudo) | `/sh /nginx-test` |
-| **`nginx-reload`**| Tải lại cấu hình Nginx không downtime. | `sudo systemctl reload nginx` (yêu cầu quyền sudo) | `/sh /nginx-reload` |
 | **`nginx-status`**| Xem trạng thái hoạt động của Nginx. | `sudo systemctl status nginx` (yêu cầu quyền sudo) | `/sh /nginx-status` |
 | **`pm2-list`**   | Liệt kê các ứng dụng PM2 đang chạy. | `pm2 list` | `/sh /pm2-list` |
 | **`pm2-restart`**| Khởi động lại một ứng dụng PM2 cụ thể.| `pm2 restart <app>` | `/sh /pm2-restart assistant-bot`<br>*Lưu ý: `<app>` phải nằm trong danh sách được phép: `assistant-bot`, `app`, `server`, `worker`* |
-| **`mkdir-project`**| Tạo thư mục cho dự án mới trên server. | `mkdir -p /home/hnt/web/<project>` | `/sh /mkdir-project my-new-website`<br>*Tạo thư mục `/home/hnt/web/my-new-website`* |
-| **`mv-zip`**     | Di chuyển file nén ZIP dự án. | `mv /home/hnt/<zip> /home/hnt/web/<project>` | `/sh /mv-zip dist.zip my-new-website`<br>*Di chuyển file `dist.zip` từ `/home/hnt` vào `/home/hnt/web/my-new-website`* |
-| **`extract-deploy`**| Giải nén và dọn dẹp deploy thủ công. | `cd /home/hnt/web/<project> && rm -rf dist && unzip -o <zip> && rm -f <zip>` (Chạy qua bash shell) | `/sh /extract-deploy my-new-website dist.zip` |
-| **`chmod-nginx`**| Phân quyền thư mục web cho Nginx. | 1. `sudo chmod +x /home/hnt`<br>2. `sudo chmod +x /home/hnt/web`<br>3. `sudo chmod -R 755 /home/hnt/web/<project>` | `/sh /chmod-nginx my-new-website` |
-| **`nginx-link`** | Tạo liên kết cấu hình Nginx ảo. | `sudo ln -s /etc/nginx/sites-available/<site> /etc/nginx/sites-enabled/` | `/sh /nginx-link my-new-website.conf` |
-| **`nginx-create`**| Tạo file cấu hình Virtual Host Nginx cho SPA (React, Vue, v.v.). | Tạo file cấu hình Nginx mẫu tại `/etc/nginx/sites-available/<site>` với cấu hình lắng nghe cổng 80, trỏ tên miền tới `<server>` và thư mục tĩnh là `<root>`. | `/sh /nginx-create my-site.conf mydomain.com /home/hnt/web/my-project/dist`<br>*Tham số thứ tự: `[tên_file_cấu_hình] [tên_miền] [đường_dẫn_root]`* |
-| **`ls`**         | Liệt kê nội dung trong thư mục chỉ định. | `bash -lc 'ls -la "<path>"'` | `/sh /ls /home/hnt/web` |
-| **`cd`**         | Chuyển thư mục hiện tại của phiên con. | `bash -lc 'cd "<path>" && pwd && ls -la'` | `/sh /cd /home/hnt/web/assistant-bot` |
-| **`cat`**        | Đọc nội dung của một file văn bản. | `bash -lc 'head -c 65536 "<file>"'` (Chỉ lấy tối đa 64KB đầu tiên để tránh tràn tin nhắn) | `/sh /cat /home/hnt/web/assistant-bot/.env` |
 
 ---
 
