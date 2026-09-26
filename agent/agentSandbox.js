@@ -281,8 +281,10 @@ async function runSelfUpdate(options = {}) {
   }
 }
 
-function restartSelf() {
-  execFile('pm2', ['restart', 'assistant-node-agent'], () => {});
+function restartSelf(options = {}) {
+  const runner = options.execFile || execFile;
+  const processName = options.processName || process.env.PM2_AGENT_PROCESS_NAME || 'assistant-node-agent';
+  runner('pm2', ['restart', processName, '--update-env', '--max-memory-restart', '100M'], () => {});
 }
 
 async function getProcessList() {
