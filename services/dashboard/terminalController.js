@@ -36,10 +36,11 @@ async function handleExecSh(req, res, { config, depNodeManager, depNodeClient, d
         out = remoteRes.error || remoteRes.stderr || 'Lệnh thất bại';
       }
 
-      sendJson(res, remoteRes.ok ? 200 : 502, {
+      sendJson(res, remoteRes.ok ? 200 : (remoteRes.status || 400), {
         ok: remoteRes.ok,
         node: { id: selectedNode.id, name: selectedNode.name || selectedNode.id },
         output: out,
+        error: remoteRes.ok ? undefined : out,
       });
       return;
     }
