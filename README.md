@@ -121,7 +121,7 @@ pm2 save
 
 ### Oracle Worker: chuẩn bị đường dẫn deploy và cổng web
 
-Trên Oracle Worker, đặt `WEB_DEPLOY_DIR=/var/www` trong `.env` của agent, cài `unzip` và bảo đảm tài khoản chạy agent có quyền tạo thư mục trong `/var/www` và ghi cấu hình Nginx. Agent báo lỗi nếu giải nén, cấp quyền đọc hoặc cấu hình Nginx thất bại. Trang web được giải nén với quyền đọc cho Nginx; kiểm tra quyền của các thư mục cha bằng `namei -l /var/www/<project>/index.html`.
+Trên Oracle Worker, đặt `WEB_DEPLOY_DIR` thành đường dẫn tuyệt đối trong `.env` ở gốc repo, cài `unzip` và bảo đảm tài khoản chạy agent có quyền tạo thư mục tại đó. Nếu dùng thư mục trong home, Nginx còn cần quyền đi qua các thư mục cha; kiểm tra bằng `namei -l "$HOME/web"`. Agent chạy dưới tài khoản thường nhưng dùng `sudo -n` để cài/gỡ cấu hình site trong `/etc/nginx/conf.d`, chạy `nginx -t` và reload Nginx. Tài khoản chạy agent phải có sudo không cần mật khẩu cho `install`, `rm`, `nginx -t` và `systemctl reload nginx`; kiểm tra bằng `sudo -n -l` và `sudo -n nginx -t`. Phiên bản worker này chưa hỗ trợ helper sudo riêng. Không mở quyền ghi cho cả `/etc/nginx/conf.d`. Nếu bước cài đặt hoặc reload thất bại, bot sẽ hiển thị lỗi Oracle trả về.
 
 Trong OCI Console, mở **Networking → Virtual Cloud Networks → VCN → Security Lists** (hoặc Network Security Group gắn với instance), thêm ingress TCP 80 và 443 từ nguồn cần phục vụ. Oracle lưu ý phải kiểm tra cả quy tắc mạng OCI và firewall trong hệ điều hành: [OCI security rules](https://docs.oracle.com/en-us/iaas/Content/Security/Reference/configuration_tasks.htm).
 

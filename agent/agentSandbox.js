@@ -61,21 +61,51 @@ async function activateNginxConfig(confPath, contents, options = {}) {
     if (err.code !== 'ENOENT') throw err;
   }
 
-  await fs.mkdir(path.dirname(confPath), { recursive: true });
-  await fs.writeFile(confPath, contents, 'utf8');
+  async function changeConfig(value) {
+    if (value === null) {
+      if (platform === 'linux') {
+        const removed = await command('sudo', ['-n', 'rm', '-f', confPath]);
+        if (!removed.ok) throw new Error(`Nginx config removal failed: ${removed.stderr}`);
+      } else {
+        await fs.rm(confPath, { force: true });
+      }
+      return;
+    }
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-nginx-'));
+    const tempPath = path.join(tempDir, 'site.conf');
+    try {
+      await fs.writeFile(tempPath, value, { mode: 0o600 });
+      if (platform === 'linux') {
+        const installed = await command('sudo', ['-n', 'install', '-m', '644', tempPath, confPath]);
+        if (!installed.ok) throw new Error(`Nginx config install failed: ${installed.stderr}`);
+      } else {
+        await fs.mkdir(path.dirname(confPath), { recursive: true });
+        await fs.copyFile(tempPath, confPath);
+      }
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  }
+
   try {
+    await changeConfig(contents);
     if (platform === 'linux') {
-      const tested = await command('nginx', ['-t']);
+      const tested = await command('sudo', ['-n', 'nginx', '-t']);
       if (!tested.ok) throw new Error(`nginx -t failed: ${tested.stderr}`);
-      const reloaded = await command('systemctl', ['reload', 'nginx']);
+      const reloaded = await command('sudo', ['-n', 'systemctl', 'reload', 'nginx']);
       if (!reloaded.ok) throw new Error(`nginx reload failed: ${reloaded.stderr}`);
     }
   } catch (err) {
-    if (previous === null) await fs.rm(confPath, { force: true });
-    else await fs.writeFile(confPath, previous, 'utf8');
+    try {
+      await changeConfig(previous);
+    } catch (rollbackError) {
+      throw new Error(`${err.message}; rollback failed: ${rollbackError.message}`);
+    }
     if (platform === 'linux') {
-      const restored = await command('nginx', ['-t']);
-      if (restored.ok) await command('systemctl', ['reload', 'nginx']);
+      const restored = await command('sudo', ['-n', 'nginx', '-t']);
+      if (!restored.ok) throw new Error(`${err.message}; rollback nginx -t failed: ${restored.stderr}`);
+      const reloaded = await command('sudo', ['-n', 'systemctl', 'reload', 'nginx']);
+      if (!reloaded.ok) throw new Error(`${err.message}; rollback reload failed: ${reloaded.stderr}`);
     }
     throw err;
   }
@@ -186,19 +216,11 @@ async function removeProject(projectName, options = {}) {
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
   const webDeployDir = resolveWebDeployDir(options);
   const targetDir = path.join(webDeployDir, sanitizedName);
-
-  await fs.rm(targetDir, { recursive: true, force: true }).catch(() => {});
-
   const confDir = options.nginxConfDir || '/etc/nginx/conf.d';
   const confPath = path.join(confDir, `${sanitizedName}.conf`);
-  await fs.rm(confPath, { force: true }).catch(() => {});
+  await activateNginxConfig(confPath, null, options);
 
-  if (process.platform === 'linux') {
-    const testRes = await runCmd('nginx', ['-t']);
-    if (testRes.ok) {
-      await runCmd('systemctl', ['reload', 'nginx']);
-    }
-  }
+  await fs.rm(targetDir, { recursive: true, force: true });
 
   return { ok: true, projectName: sanitizedName };
 }

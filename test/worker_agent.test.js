@@ -299,14 +299,102 @@ async function runTests() {
     }
     const confPath = path.join(temp, 'site.conf');
     await fs.writeFile(confPath, 'working config');
+    const sudoCommands = [];
     await assert.rejects(
       agentSandbox.activateNginxConfig(confPath, 'broken config', {
         platform: 'linux',
-        runCommand: async (command) => ({ ok: command !== 'nginx' || (await fs.readFile(confPath, 'utf8')) === 'working config', stderr: 'bad config' }),
+        runCommand: async (command, args) => {
+          sudoCommands.push([command, ...args]);
+          assert.strictEqual(command, 'sudo');
+          assert.strictEqual(args[0], '-n');
+          if (args[1] === 'install') {
+            await fs.copyFile(args[4], args[5]);
+            return { ok: true };
+          }
+          if (args[1] === 'nginx') {
+            return { ok: (await fs.readFile(confPath, 'utf8')) === 'working config', stderr: 'bad config' };
+          }
+          return { ok: true };
+        },
       }),
       /nginx -t failed/
     );
     assert.strictEqual(await fs.readFile(confPath, 'utf8'), 'working config', 'failed activation restores prior config');
+    assert.ok(sudoCommands.some((args) => args[2] === 'install'), 'site config installed with sudo');
+    assert.ok(sudoCommands.some((args) => args[2] === 'nginx'), 'Nginx checked with sudo');
+    let firstInstall = true;
+    await assert.rejects(
+      agentSandbox.activateNginxConfig(confPath, 'new config', {
+        platform: 'linux',
+        runCommand: async (_command, args) => {
+          if (args[1] === 'install') {
+            await fs.copyFile(args[4], args[5]);
+            if (firstInstall) {
+              firstInstall = false;
+              return { ok: false, stderr: 'partial install failed' };
+            }
+          }
+          return { ok: true };
+        },
+      }),
+      /partial install failed/
+    );
+    assert.strictEqual(await fs.readFile(confPath, 'utf8'), 'working config', 'failed install restores prior config');
+    await assert.rejects(
+      agentSandbox.activateNginxConfig(confPath, 'new config', {
+        platform: 'linux',
+        runCommand: async (_command, args) => {
+          if (args[1] === 'install') await fs.copyFile(args[4], args[5]);
+          if (args[1] === 'systemctl') return { ok: false, stderr: 'reload unavailable' };
+          return { ok: true };
+        },
+      }),
+      /rollback reload failed: reload unavailable/
+    );
+    assert.strictEqual(await fs.readFile(confPath, 'utf8'), 'working config');
+    const projectDir = path.join(temp, 'remove-me');
+    const nginxDir = path.join(temp, 'nginx');
+    await fs.mkdir(projectDir);
+    await fs.mkdir(nginxDir);
+    const removableConf = path.join(nginxDir, 'remove-me.conf');
+    await fs.writeFile(removableConf, 'site config');
+    const removeCommands = [];
+    await agentSandbox.removeProject('remove-me', {
+      webDeployDir: temp,
+      nginxConfDir: nginxDir,
+      platform: 'linux',
+      runCommand: async (command, args) => {
+        removeCommands.push([command, ...args]);
+        if (command !== 'sudo' || args[0] !== '-n') return { ok: false, stderr: 'sudo required' };
+        if (args[1] === 'rm') await fs.rm(args[3], { force: true });
+        return { ok: true };
+      },
+    });
+    await assert.rejects(fs.access(removableConf), /ENOENT/);
+    await assert.rejects(fs.access(projectDir), /ENOENT/);
+    assert.ok(removeCommands.some((args) => args[2] === 'systemctl'), 'Nginx reloaded through sudo on undeploy');
+    await fs.mkdir(projectDir);
+    await fs.writeFile(removableConf, 'live site config');
+    let firstReload = true;
+    await assert.rejects(
+      agentSandbox.removeProject('remove-me', {
+        webDeployDir: temp,
+        nginxConfDir: nginxDir,
+        platform: 'linux',
+        runCommand: async (_command, args) => {
+          if (args[1] === 'rm') await fs.rm(args[3], { force: true });
+          if (args[1] === 'install') await fs.copyFile(args[4], args[5]);
+          if (args[1] === 'systemctl' && firstReload) {
+            firstReload = false;
+            return { ok: false, stderr: 'reload denied' };
+          }
+          return { ok: true };
+        },
+      }),
+      /reload denied/
+    );
+    assert.strictEqual(await fs.readFile(removableConf, 'utf8'), 'live site config', 'failed undeploy restores config');
+    await fs.access(projectDir);
     await assert.rejects(
       agentSandbox.deployZipPayload(Buffer.from('x'), 'safe-name', 'bad;server_name injected', { webDeployDir: temp }),
       /Invalid subdomain/

@@ -94,10 +94,31 @@ async function runTests() {
   const customSubDeployReq = requests[requests.length - 1];
   assert.strictEqual(customSubDeployReq.opts.headers['x-subdomain'], 'custom-sub');
 
+  await assert.rejects(
+    nodeClient.deploy(node, { projectName: 'demo-app', zipBuffer }, {
+      post: async () => {
+        const error = new Error('Request failed with status code 500');
+        error.response = { status: 500, data: { ok: false, error: 'Nginx configuration failed: permission denied' } };
+        throw error;
+      },
+    }),
+    /Nginx configuration failed: permission denied/
+  );
+
   // 7. undeploy
   const undeployed = await nodeClient.undeploy(node, 'demo-app', fakeClient);
   assert.strictEqual(undeployed.ok, true);
   assert.strictEqual(undeployed.removed, true);
+  await assert.rejects(
+    nodeClient.undeploy(node, 'demo-app', {
+      post: async () => {
+        const error = new Error('Request failed with status code 500');
+        error.response = { status: 500, data: { ok: false, error: 'Nginx config removal failed: permission denied' } };
+        throw error;
+      },
+    }),
+    /Nginx config removal failed: permission denied/
+  );
 
   // 8. update
   const updated = await nodeClient.update(node, fakeClient);
