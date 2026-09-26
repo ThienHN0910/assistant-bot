@@ -6,6 +6,8 @@ const axios = require('axios');
 const si = require('systeminformation');
 const deployer = require('../lib/deployer');
 const repoInspector = require('../lib/repoInspector');
+const nodeManager = require('../lib/nodeManager');
+const nodeClient = require('../lib/nodeClient');
 const { formatFileSize } = require('../config/utils');
 
 let serverInstance = null;
@@ -147,6 +149,9 @@ function createDashboardServer(config, deps = {}) {
   const httpClient = deps.axios || axios;
   const depDeployer = deps.deployer || deployer;
   const depInspector = deps.inspector || repoInspector;
+  const depNodeManager = deps.nodeManager || nodeManager;
+  const depNodeClient = deps.nodeClient || nodeClient;
+  const depSi = deps.si || si;
 
   const server = http.createServer(async (req, res) => {
     setCorsHeaders(req, res, config);
@@ -197,6 +202,28 @@ function createDashboardServer(config, deps = {}) {
         googleClientId: config.googleClientId || '',
         authType: 'google',
       });
+      return;
+    }
+
+    // 2.1 Cluster Nodes (public - IPs masked, no secrets)
+    if (pathname === '/api/nodes' && req.method === 'GET') {
+      try {
+        const rawNodes = await depNodeManager.getNodes(config);
+        const nodes = rawNodes.map((n) => {
+          const ipMasked = depNodeManager.maskIp ? depNodeManager.maskIp(n.ip) : (n.ip ? `${n.ip.split('.')[0]}.***` : '');
+          return {
+            id: n.id,
+            name: n.name || n.id,
+            isLocal: Boolean(n.isLocal),
+            status: n.status || 'online',
+            ipMasked,
+            ip: ipMasked,
+          };
+        });
+        sendJson(res, 200, { ok: true, nodes });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
       return;
     }
 
@@ -287,37 +314,124 @@ function createDashboardServer(config, deps = {}) {
       return;
     }
 
-    // 5. System Status
+    // 5. System Status & Multi-Node Cluster Telemetry
     if (pathname === '/api/status' && req.method === 'GET') {
       try {
         const [cpu, mem, fsSize, time] = await Promise.all([
-          si.currentLoad().catch(() => ({ currentLoad: 0 })),
-          si.mem().catch(() => ({ total: 1, used: 0, free: 0 })),
-          si.fsSize().catch(() => []),
-          si.time(),
+          depSi.currentLoad().catch(() => ({ currentLoad: 0 })),
+          depSi.mem().catch(() => ({ total: 1, used: 0, free: 0 })),
+          depSi.fsSize().catch(() => []),
+          depSi.time(),
         ]);
 
         const rootDisk = fsSize.find((f) => f.mount === '/') || fsSize[0] || { size: 0, used: 0 };
+        const localUptime = time?.uptime || process.uptime();
+
+        const system = {
+          cpuLoad: Math.round(cpu.currentLoad || 0),
+          memory: {
+            totalBytes: mem.total,
+            usedBytes: mem.used,
+            usedPercentage: Math.round((mem.used / (mem.total || 1)) * 100),
+            formatted: `${formatFileSize(mem.used)} / ${formatFileSize(mem.total)}`,
+          },
+          disk: {
+            totalBytes: rootDisk.size,
+            usedBytes: rootDisk.used,
+            usedPercentage: Math.round(rootDisk.use || 0),
+            formatted: `${formatFileSize(rootDisk.used)} / ${formatFileSize(rootDisk.size)}`,
+          },
+          uptimeSeconds: localUptime,
+          uptimeFormatted: `${Math.floor(localUptime / 86400)}d ${Math.floor((localUptime % 86400) / 3600)}h`,
+        };
+
+        const clusterNodesRaw = await depNodeManager.getNodes(config);
+        const nodes = await Promise.all(
+          clusterNodesRaw.map(async (node) => {
+            const ipMasked = depNodeManager.maskIp ? depNodeManager.maskIp(node.ip) : (node.ip ? `${node.ip.split('.')[0]}.***` : '');
+            if (node.isLocal) {
+              return {
+                id: node.id,
+                name: node.name || node.id,
+                isLocal: true,
+                status: 'online',
+                ipMasked,
+                cpuLoad: system.cpuLoad,
+                memory: system.memory,
+                disk: system.disk,
+                uptimeSeconds: system.uptimeSeconds,
+                uptimeFormatted: system.uptimeFormatted,
+              };
+            }
+
+            try {
+              const res = await depNodeClient.getMetrics(node, httpClient);
+              if (res && res.ok && res.metrics) {
+                const memUsed = res.metrics.memory?.usedBytes || 0;
+                const memTotal = res.metrics.memory?.totalBytes || 0;
+                const memPct = memTotal > 0
+                  ? Math.round((memUsed / memTotal) * 100)
+                  : (Number(res.metrics.memory?.usedPercentage) || 0);
+                const upSec = res.metrics.uptimeSeconds || 0;
+
+                return {
+                  id: node.id,
+                  name: node.name || node.id,
+                  isLocal: false,
+                  status: 'online',
+                  ipMasked,
+                  cpuLoad: Number(res.metrics.cpuLoad) || 0,
+                  memory: {
+                    totalBytes: memTotal,
+                    usedBytes: memUsed,
+                    usedPercentage: memPct,
+                    formatted: `${formatFileSize(memUsed)} / ${formatFileSize(memTotal)}`,
+                  },
+                  disk: res.metrics.disk || {
+                    totalBytes: 0,
+                    usedBytes: 0,
+                    usedPercentage: 0,
+                    formatted: 'N/A',
+                  },
+                  uptimeSeconds: upSec,
+                  uptimeFormatted: `${Math.floor(upSec / 86400)}d ${Math.floor((upSec % 86400) / 3600)}h`,
+                };
+              }
+              return {
+                id: node.id,
+                name: node.name || node.id,
+                isLocal: false,
+                status: 'offline',
+                ipMasked,
+                cpuLoad: 0,
+                memory: { totalBytes: 0, usedBytes: 0, usedPercentage: 0, formatted: 'Offline' },
+                disk: { totalBytes: 0, usedBytes: 0, usedPercentage: 0, formatted: 'Offline' },
+                uptimeSeconds: 0,
+                uptimeFormatted: 'Offline',
+                error: res?.error || 'Node unreachable',
+              };
+            } catch (remoteErr) {
+              return {
+                id: node.id,
+                name: node.name || node.id,
+                isLocal: false,
+                status: 'offline',
+                ipMasked,
+                cpuLoad: 0,
+                memory: { totalBytes: 0, usedBytes: 0, usedPercentage: 0, formatted: 'Offline' },
+                disk: { totalBytes: 0, usedBytes: 0, usedPercentage: 0, formatted: 'Offline' },
+                uptimeSeconds: 0,
+                uptimeFormatted: 'Offline',
+                error: remoteErr.message,
+              };
+            }
+          })
+        );
 
         sendJson(res, 200, {
           ok: true,
-          system: {
-            cpuLoad: Math.round(cpu.currentLoad || 0),
-            memory: {
-              totalBytes: mem.total,
-              usedBytes: mem.used,
-              usedPercentage: Math.round((mem.used / (mem.total || 1)) * 100),
-              formatted: `${formatFileSize(mem.used)} / ${formatFileSize(mem.total)}`,
-            },
-            disk: {
-              totalBytes: rootDisk.size,
-              usedBytes: rootDisk.used,
-              usedPercentage: Math.round(rootDisk.use || 0),
-              formatted: `${formatFileSize(rootDisk.used)} / ${formatFileSize(rootDisk.size)}`,
-            },
-            uptimeSeconds: time?.uptime || process.uptime(),
-            uptimeFormatted: `${Math.floor((time?.uptime || process.uptime()) / 86400)}d ${Math.floor(((time?.uptime || process.uptime()) % 86400) / 3600)}h`,
-          },
+          system,
+          nodes,
         });
       } catch (err) {
         sendJson(res, 500, { ok: false, error: err.message });
@@ -328,11 +442,16 @@ function createDashboardServer(config, deps = {}) {
     // 6. List All Deployments
     if (pathname === '/api/deployments' && req.method === 'GET') {
       try {
+        const clusterNodesRaw = await depNodeManager.getNodes(config).catch(() => []);
+        const clusterNodesMap = new Map(clusterNodesRaw.map((n) => [n.id, n]));
         const rawDeployments = await depDeployer.listAllDeployments(config);
         const deployments = rawDeployments.map((d) => {
           let dnsTarget = 'Chưa xác định';
           if (d.target === 'vps') {
-            dnsTarget = `A Record -> ${config.vpsPublicIp || 'VPS IP'}`;
+            const node = clusterNodesMap.get(d.nodeId || 'gcp-master');
+            const targetIp = node?.ip || config.vpsPublicIp || '';
+            const maskedIp = depNodeManager.maskIp ? depNodeManager.maskIp(targetIp) : (targetIp ? `${targetIp.split('.')[0]}.***` : 'VPS IP');
+            dnsTarget = `A Record -> ${maskedIp || 'VPS IP'}`;
           } else if (d.target === 'vercel') {
             dnsTarget = `CNAME -> ${d.cnameTarget || 'cname.vercel-dns.com'}`;
           } else if (d.target === 'render') {
@@ -384,6 +503,7 @@ function createDashboardServer(config, deps = {}) {
             projectName: body.projectName || body.subdomain,
             target: body.target,
             subdomain: body.subdomain,
+            nodeId: body.nodeId,
           },
           config
         );
