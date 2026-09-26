@@ -123,12 +123,32 @@ async function runTests() {
     ],
   };
 
+  const mockPerf = {
+    measureHttpLatency: async (url) => ({
+      statusCode: 200,
+      ttfbMs: 45,
+      dnsMs: 12,
+      connectMs: 18,
+      totalMs: 75,
+      sizeFormatted: '12.4 KB',
+    }),
+    fetchPageSpeedScore: async (url) => ({
+      ok: true,
+      score: 95,
+      fcp: '0.8s',
+      lcp: '1.2s',
+      tbt: '10ms',
+      cls: '0.01',
+    }),
+  };
+
   const server = createDashboardServer(mockConfig, {
     nodeManager: mockNodeManager,
     nodeClient: mockNodeClient,
     si: mockSi,
     whitelist: mockWhitelist,
     runner: mockRunner,
+    perf: mockPerf,
   });
 
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -306,8 +326,78 @@ async function runTests() {
     }, { nodeId: 'gcp-master', command: 'rm -rf /' });
     assert.strictEqual(res.status, 400);
     assert.strictEqual(res.data.ok, false);
-
     console.log('✅ Task 2 operations tests passed!');
+
+    console.log('--- Testing /api/perf ---');
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/perf',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { target: 'https://bot.thienhn.io.vn' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+    assert.strictEqual(res.data.result.latency.ttfbMs, 45);
+    assert.strictEqual(res.data.result.pageSpeed.score, 95);
+
+    console.log('--- Testing /api/notes ---');
+    // GET initial notes
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/notes',
+      method: 'GET',
+      headers: { Authorization: `Bearer ${validToken}` },
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+    assert.strictEqual(res.data.notes.length, 2);
+
+    // POST new note
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/notes',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { text: 'Deploy xong dashboard ngon lanh' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+
+    // GET updated notes
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/notes',
+      method: 'GET',
+      headers: { Authorization: `Bearer ${validToken}` },
+    });
+    assert.strictEqual(res.data.notes.length, 3);
+    assert.ok(res.data.notes.some((n) => n.includes('Deploy xong dashboard ngon lanh')));
+
+    // DELETE notes
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/notes',
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${validToken}` },
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+
+    // GET notes after clear
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/notes',
+      method: 'GET',
+      headers: { Authorization: `Bearer ${validToken}` },
+    });
+    assert.strictEqual(res.data.notes.length, 0);
+
+    console.log('✅ Task 3 perf & notes tests passed!');
   } finally {
     server.close();
     await fs.unlink(mockConfig.pm2ErrorLogPath).catch(() => {});

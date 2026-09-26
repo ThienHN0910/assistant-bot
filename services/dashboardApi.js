@@ -13,6 +13,8 @@ const nodeManager = require('../lib/nodeManager');
 const nodeClient = require('../lib/nodeClient');
 const whitelist = require('../lib/whitelist');
 const runner = require('../lib/runner');
+const perf = require('../lib/perf');
+const { resolveTargetUrl } = require('../commands/perf');
 const { formatFileSize, readLastLines } = require('../config/utils');
 
 let serverInstance = null;
@@ -160,6 +162,8 @@ function createDashboardServer(config, deps = {}) {
   const depWhitelist = deps.whitelist || whitelist;
   const depRunner = deps.runner || runner;
   const depExecAsync = deps.execAsync || execAsync;
+  const depPerf = deps.perf || perf;
+  const depResolveTargetUrl = deps.resolveTargetUrl || resolveTargetUrl;
 
   const server = http.createServer(async (req, res) => {
     setCorsHeaders(req, res, config);
@@ -852,6 +856,94 @@ function createDashboardServer(config, deps = {}) {
           node: { id: selectedNode.id, name: selectedNode.name || selectedNode.id },
           output: outputLines.join('\n\n'),
         });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    // 16. Performance Test (/perf)
+    if (pathname === '/api/perf' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        const rawTarget = body.target || body.url || body.projectName;
+        if (!rawTarget) {
+          sendJson(res, 400, { ok: false, error: 'Thiếu thông tin target hoặc url' });
+          return;
+        }
+
+        const targetUrl = await depResolveTargetUrl(rawTarget, config);
+        if (!targetUrl) {
+          sendJson(res, 400, { ok: false, error: 'Không tìm thấy URL hợp lệ để đo hiệu năng' });
+          return;
+        }
+
+        const latency = await depPerf.measureHttpLatency(targetUrl);
+        const apiKey = process.env.PAGESPEED_API_KEY || null;
+        const pageSpeed = await depPerf.fetchPageSpeedScore(targetUrl, apiKey);
+
+        sendJson(res, 200, {
+          ok: true,
+          result: {
+            targetUrl,
+            latency,
+            pageSpeed,
+          },
+        });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    // 17. Notes Manager (/notes)
+    if (pathname === '/api/notes' && req.method === 'GET') {
+      try {
+        const notesPath = config?.notesFilePath || './notes.txt';
+        let notes = [];
+        try {
+          await fs.access(notesPath);
+          const raw = await fs.readFile(notesPath, 'utf8');
+          notes = raw
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+        } catch {
+          notes = [];
+        }
+        sendJson(res, 200, { ok: true, notes });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    if (pathname === '/api/notes' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        const text = (body.text || '').trim();
+        if (!text) {
+          sendJson(res, 400, { ok: false, error: 'Thiếu nội dung ghi chú (text)' });
+          return;
+        }
+
+        const notesPath = config?.notesFilePath || './notes.txt';
+        const timestamp = new Date().toLocaleString('vi-VN', { hour12: false });
+        const line = `[${timestamp}] ${text}\n`;
+        await fs.appendFile(notesPath, line, 'utf8');
+
+        sendJson(res, 200, { ok: true, message: 'Đã lưu ghi chú thành công' });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    if (pathname === '/api/notes' && req.method === 'DELETE') {
+      try {
+        const notesPath = config?.notesFilePath || './notes.txt';
+        await fs.writeFile(notesPath, '', 'utf8');
+        sendJson(res, 200, { ok: true, message: 'Đã xóa toàn bộ ghi chú' });
       } catch (err) {
         sendJson(res, 500, { ok: false, error: err.message });
       }
