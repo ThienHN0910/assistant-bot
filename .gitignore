@@ -8,3 +8,6 @@ notes.txt
 logs/
 *.log
 .scratch/
+data/*.json
+!data/*.example.json
+data/uploads/
