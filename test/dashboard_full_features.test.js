@@ -112,9 +112,10 @@ async function runTests() {
   const mockWhitelist = {
     getCommands: (alias, args) => {
       if (alias === 'pm2-list') return [{ cmd: 'pm2', args: ['list'] }];
+      if (alias === 'uptime') return [{ cmd: 'uptime', args: [] }];
       throw new Error(`Alias không hợp lệ: ${alias}`);
     },
-    listAliases: () => ['pm2-list', 'git-status'],
+    listAliases: () => ['pm2-list', 'git-status', 'uptime', 'disk-usage', 'mem-check'],
   };
 
   const mockRunner = {
@@ -292,6 +293,21 @@ async function runTests() {
     assert.strictEqual(res.data.ok, true);
 
     console.log('--- Testing /api/sh ---');
+    // GET /api/sh/aliases
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/sh/aliases',
+      method: 'GET',
+      headers: { Authorization: `Bearer ${validToken}` },
+    });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+    assert.ok(Array.isArray(res.data.aliases));
+    assert.ok(res.data.aliases.includes('uptime'));
+    assert.ok(res.data.aliases.includes('disk-usage'));
+    assert.ok(res.data.aliases.includes('mem-check'));
+
     // Remote sh
     res = await httpRequest({
       hostname: '127.0.0.1',
@@ -303,6 +319,18 @@ async function runTests() {
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.data.ok, true);
     assert.ok(res.data.output.includes('Worker output for: uptime'));
+
+    // Remote sh with leading slash
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/sh',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { nodeId: 'oracle-worker', command: '/pm2-list' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+    assert.ok(res.data.output.includes('Worker output for: pm2-list'));
 
     // Local sh with whitelist alias
     res = await httpRequest({

@@ -223,6 +223,16 @@ async function runTests() {
     const allowed = await makeRequest(server, { path: '/api/exec', method: 'POST', headers }, JSON.stringify({ command: 'hostname' }));
     assert.strictEqual(allowed.status, 200);
     assert.strictEqual(allowed.data.stdout, 'hostname ');
+
+    const aliasWithSlash = await makeRequest(server, { path: '/api/exec', method: 'POST', headers }, JSON.stringify({ command: '/pm2-list' }));
+    assert.strictEqual(aliasWithSlash.status, 200);
+
+    const paramRestartAllowed = await makeRequest(server, { path: '/api/exec', method: 'POST', headers }, JSON.stringify({ command: '/pm2-restart assistant-bot' }));
+    assert.strictEqual(paramRestartAllowed.status, 200);
+
+    const paramRestartBlocked = await makeRequest(server, { path: '/api/exec', method: 'POST', headers }, JSON.stringify({ command: '/pm2-restart evil-app' }));
+    assert.strictEqual(paramRestartBlocked.status, 403);
+
     const blocked = await makeRequest(server, { path: '/api/exec', method: 'POST', headers }, JSON.stringify({ command: 'rm -rf /' }));
     assert.strictEqual(blocked.status, 403);
 

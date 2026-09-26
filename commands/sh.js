@@ -68,13 +68,13 @@ module.exports = {
 
       let commands;
       try {
-        commands = whitelist.getCommands(alias, args);
+        commands = (deps.whitelist || whitelist).getCommands(alias, args);
       } catch (err) {
         await ctx.replyWithHTML(`🚫 Lỗi: ${escapeHtml(String(err.message || err))}`);
         return;
       }
 
-      const results = await runner.runSequence(commands, { timeoutMs: 60000 });
+      const results = await (deps.runner || runner).runSequence(commands, { timeoutMs: 60000 });
 
       const blocks = [];
       for (let i = 0; i < commands.length; i++) {

@@ -786,23 +786,37 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
 
         // Web Whitelisted Terminal (/sh)
         const terminalNode = ref('gcp-master');
-        const availableAliases = ref(['pm2-list', 'git-status', 'disk-usage', 'uptime', 'netstat-listen', 'pm2-restart assistant-bot', 'update', 'cleancache']);
+        const availableAliases = ref([
+          'uptime', 'disk-usage', 'mem-check', 'cpu-info', 'top-procs',
+          'os-release', 'netstat-listen', 'git-status', 'git-log',
+          'nginx-test', 'nginx-status', 'pm2-list', 'pm2-status',
+          'pm2-restart assistant-bot', 'pm2-logs assistant-bot'
+        ]);
         const selectedAlias = ref('');
         const terminalCommand = ref('');
         const terminalOutput = ref('');
         const runningTerminal = ref(false);
 
+        function stripAnsi(text) {
+          if (typeof text !== 'string') return text;
+          return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+        }
+
         function onAliasSelect() {
           if (selectedAlias.value) {
-            terminalCommand.value = selectedAlias.value;
+            const cmd = selectedAlias.value.trim();
+            terminalCommand.value = cmd.startsWith('/') ? cmd : `/${cmd}`;
           }
         }
 
         async function fetchAliases() {
           try {
-            const res = await fetch('/api/sh/aliases').then((r) => r.json());
-            if (res.ok && Array.isArray(res.aliases)) {
-              availableAliases.value = res.aliases;
+            const res = await apiRequest('/api/sh/aliases');
+            if (res && res.ok && Array.isArray(res.aliases)) {
+              availableAliases.value = res.aliases.map((a) => {
+                if (a === 'pm2-restart' || a === 'pm2-logs') return `${a} assistant-bot`;
+                return a;
+              });
             }
           } catch {}
         }
@@ -818,13 +832,13 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
                 nodeId: terminalNode.value,
               }),
             });
-            if (res.ok) {
-              terminalOutput.value = res.output || 'Lệnh thực thi thành công (không có đầu ra)';
+            if (res && res.ok) {
+              terminalOutput.value = stripAnsi(res.output) || 'Lệnh thực thi thành công (không có đầu ra)';
             } else {
-              terminalOutput.value = `❌ Lỗi: ${res.error || res.output || 'Lệnh thất bại'}`;
+              terminalOutput.value = `❌ Lỗi: ${stripAnsi(res?.error || res?.output || 'Lệnh thất bại')}`;
             }
           } catch (err) {
-            terminalOutput.value = `❌ Lỗi kết nối: ${err.message}`;
+            terminalOutput.value = `❌ Lỗi kết nối: ${stripAnsi(err.message)}`;
           } finally {
             runningTerminal.value = false;
           }

@@ -47,6 +47,9 @@ async function runTests() {
   assert.deepStrictEqual(calls.pop(), ['restart', 'oracle-worker']);
   assert.match(await invoke('sh', '/sh oracle-worker hostname'), /&lt;worker&gt;/);
   assert.deepStrictEqual(calls.pop(), ['exec', 'oracle-worker', 'hostname']);
+  assert.match(await invoke('sh', '/sh oracle-worker /pm2-list'), /&lt;worker&gt;/);
+  assert.deepStrictEqual(calls.pop(), ['exec', 'oracle-worker', '/pm2-list']);
+  assert.match(await invoke('sh', '/sh /uptime', { runner: { runSequence: async () => [{ ok: true, stdout: 'up 1 day' }] } }), /up 1 day/);
   const before = calls.length;
   assert.match(await invoke('restart', '/restart missing-node'), /không|not found|không tồn tại/i);
   assert.strictEqual(calls.length, before, 'unknown node cannot restart local master');
