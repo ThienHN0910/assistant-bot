@@ -4,10 +4,11 @@ const { escapeHtml } = require('../config/utils');
 const deployStore = require('../lib/deployStore');
 
 const repoInspector = require('../lib/repoInspector');
+const nodeManager = require('../lib/nodeManager');
 
 const GITHUB_REPO_REGEX = /https?:\/\/github\.com\/([a-zA-Z0-9_.-]+)\/([a-zA-Z0-9_.-]+)(\/)?/i;
 
-function buildGitDeployMessage(repoUrl, projectName, subdomain, baseDomain, validTargets, deployId, inspection = null) {
+function buildGitDeployMessage(repoUrl, projectName, subdomain, baseDomain, validTargets, deployId, inspection = null, vpsNodes = []) {
   const expectedDomain = `${subdomain}.${baseDomain}`;
   const buttons = [];
 
@@ -28,7 +29,9 @@ function buildGitDeployMessage(repoUrl, projectName, subdomain, baseDomain, vali
   } else {
     const targetRow = [];
     if (validTargets.includes('vps')) {
-      targetRow.push({ text: `🖥️ VPS (${subdomain})`, callback_data: `git_target:${deployId}:vps` });
+      for (const node of vpsNodes) {
+        buttons.push([{ text: `🖥️ VPS ${node.name || node.id}`, callback_data: `git_target:${deployId}:vps:${node.id}` }]);
+      }
     }
     if (validTargets.includes('vercel')) {
       targetRow.push({ text: `▲ Vercel (${subdomain})`, callback_data: `git_target:${deployId}:vercel` });
@@ -89,6 +92,7 @@ function buildGitDeployMessage(repoUrl, projectName, subdomain, baseDomain, vali
 }
 
 function createTextHandler(config, deps = {}) {
+  const depNM = deps.nodeManager || nodeManager;
   return async (ctx) => {
     try {
       const text = ctx.message?.text;
@@ -123,6 +127,7 @@ function createTextHandler(config, deps = {}) {
         const baseDomain = config.baseDomain || 'thienhn.io.vn';
         const repoType = pending.inspection?.type || null;
         const validTargets = deployer.getValidTargetsForSource('github_public', config, repoType);
+        const vpsNodes = validTargets.includes('vps') ? await depNM.getNodes(config) : [];
         const { html, buttons } = buildGitDeployMessage(
           pending.repoUrl,
           pending.projectName,
@@ -130,7 +135,8 @@ function createTextHandler(config, deps = {}) {
           baseDomain,
           validTargets,
           awaitingDeployId,
-          pending.inspection
+          pending.inspection,
+          vpsNodes
         );
 
         await ctx.replyWithHTML(`✅ <b>Đã cập nhật tên miền thành công!</b>\n\n${html}`, {
@@ -156,6 +162,7 @@ function createTextHandler(config, deps = {}) {
 
         const repoType = inspection?.type || null;
         let validTargets = deployer.getValidTargetsForSource('github_public', config, repoType);
+        const vpsNodes = validTargets.includes('vps') ? await depNM.getNodes(config) : [];
         if (inspection?.type === 'monorepo' && validTargets.includes('vercel') && validTargets.includes('render')) {
           validTargets.push('both');
         }
@@ -190,7 +197,8 @@ function createTextHandler(config, deps = {}) {
           baseDomain,
           validTargets,
           deployId,
-          inspection
+          inspection,
+          vpsNodes
         );
 
         await ctx.replyWithHTML(html, {

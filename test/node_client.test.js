@@ -104,6 +104,30 @@ async function runTests() {
   assert.strictEqual(updated.ok, true);
   assert.strictEqual(updated.output, 'Updated successfully');
 
+  const remoteClient = {
+    async get(url, options) {
+      assert.strictEqual(options.headers['X-Agent-Secret'], 'test-secret');
+      if (url.endsWith('/api/processes')) return { data: { ok: true, processes: [{ pid: 1 }] } };
+      if (url.endsWith('/api/logs?lines=8')) return { data: { ok: true, log: 'remote log' } };
+      throw new Error(`Unexpected GET ${url}`);
+    },
+    async post(url, body, options) {
+      assert.strictEqual(options.headers['X-Agent-Secret'], 'test-secret');
+      if (url.endsWith('/api/cleancache')) return { data: { ok: true, result: { pm2Flush: 'OK' } } };
+      if (url.endsWith('/api/restart')) return { data: { ok: true } };
+      if (url.endsWith('/api/exec')) {
+        assert.deepStrictEqual(body, { command: 'hostname' });
+        return { data: { ok: true, stdout: 'worker', stderr: '' } };
+      }
+      throw new Error(`Unexpected POST ${url}`);
+    },
+  };
+  assert.strictEqual((await nodeClient.getProcesses(node, remoteClient)).processes[0].pid, 1);
+  assert.strictEqual((await nodeClient.getLogs(node, 8, remoteClient)).log, 'remote log');
+  assert.strictEqual((await nodeClient.cleanCache(node, remoteClient)).result.pm2Flush, 'OK');
+  assert.strictEqual((await nodeClient.restartAgent(node, remoteClient)).ok, true);
+  assert.strictEqual((await nodeClient.execCommand(node, 'hostname', remoteClient)).stdout, 'worker');
+
   console.log('✅ nodeClient unit tests passed');
 }
 

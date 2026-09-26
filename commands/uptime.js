@@ -1,4 +1,7 @@
 const si = require('systeminformation');
+const nodeManager = require('../lib/nodeManager');
+const nodeClient = require('../lib/nodeClient');
+const { escapeHtml } = require('../config/utils');
 
 function formatDuration(seconds) {
     const days = Math.floor(seconds / (24 * 3600));
@@ -11,7 +14,7 @@ function formatDuration(seconds) {
 module.exports = {
     name: 'uptime',
     description: 'Xem thời gian uptime của server',
-    async execute(ctx) {
+    async execute(ctx, config = {}, deps = {}) {
         try {
             const text = ctx.message?.text || '';
             const args = text.trim().split(/\s+/).slice(1);
@@ -25,25 +28,18 @@ module.exports = {
                 return;
             }
 
-            // si.time() trả về dữ liệu đồng bộ (synchronous)
-            const timeData = si.time();
-            const uptimeSeconds = (timeData && typeof timeData.uptime === 'number') ? timeData.uptime : 0;
-
-            const durationText = formatDuration(uptimeSeconds);
-            const bootRaw = timeData && (timeData.boot || timeData.boot_time || timeData.bootTime || timeData.boottime);
-            const bootText = bootRaw ? new Date(bootRaw).toLocaleString('vi-VN') : null;
-
-            const lines = [];
-            // Sử dụng các thẻ HTML: <b> để in đậm, <code> để tạo khối text monospace (code block)
-            lines.push('⏱️ <b>TRẠNG THÁI HOẠT ĐỘNG SERVER</b>');
-            lines.push('');
-            lines.push(`• <b>Thời gian đã chạy:</b> <code>${durationText}</code>`);
-            if (bootText) {
-                lines.push(`• <b>Khởi động lúc:</b> <code>${bootText}</code>`);
-            }
-
-            // Gửi tin nhắn bằng hàm replyWithHTML cực kỳ an toàn
-            await ctx.replyWithHTML(lines.join('\n'));
+            const manager = deps.nodeManager || nodeManager;
+            const nodes = args[0] ? [await manager.getNode(args[0], config)].filter(Boolean) : await manager.getNodes(config);
+            if (!nodes.length) { await ctx.replyWithHTML('⚠️ Node không tồn tại.'); return; }
+            const blocks = await Promise.all(nodes.map(async (node) => {
+                const label = escapeHtml(node.name || node.id);
+                if (node.isLocal) return `${label}: ${formatDuration((deps.si || si).time().uptime)}`;
+                try {
+                    const result = await (deps.nodeClient || nodeClient).getMetrics(node);
+                    return result.ok ? `${label}: ${formatDuration(result.metrics?.uptimeSeconds || 0)}` : `${label}: offline`;
+                } catch { return `${label}: offline`; }
+            }));
+            await ctx.replyWithHTML(`⏱️ <b>Uptime cụm VPS</b>\n${blocks.join('\n')}`);
         } catch (error) {
             console.error('[UPTIME_COMMAND_ERROR]', error);
             try {

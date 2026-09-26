@@ -1,6 +1,8 @@
 const { escapeHtml } = require('../config/utils');
 const whitelist = require('../lib/whitelist');
 const runner = require('../lib/runner');
+const nodeManager = require('../lib/nodeManager');
+const nodeClient = require('../lib/nodeClient');
 
 function extractShellCommand(ctx) {
   const text = ctx.message?.text || '';
@@ -32,7 +34,7 @@ function buildStepOutput(step, res) {
 module.exports = {
   name: 'sh',
   description: 'Chạy lệnh shell theo whitelist an toàn (sử dụng aliases)',
-  execute: async (ctx) => {
+  execute: async (ctx, config = {}, deps = {}) => {
     try {
       const parts = extractShellCommand(ctx);
 
@@ -46,6 +48,18 @@ module.exports = {
           `<b>Ví dụ mẫu:</b> <code>/sh /pm2-restart assistant-bot</code>`
         );
         return;
+      }
+
+      if (!parts[0].startsWith('/')) {
+        const node = await (deps.nodeManager || nodeManager).getNode(parts[0], config);
+        if (node && !node.isLocal) {
+          const command = parts.slice(1).join(' ');
+          if (!command) { await ctx.replyWithHTML('⚠️ Thiếu lệnh cho node.'); return; }
+          const result = await (deps.nodeClient || nodeClient).execCommand(node, command);
+          const output = result.ok ? [result.stdout, result.stderr].filter(Boolean).join('\n') : result.error || result.stderr || 'Lệnh thất bại';
+          await ctx.replyWithHTML(`💻 <b>${escapeHtml(node.name || node.id)}</b>\n<pre>${escapeHtml(output.slice(0, 3000))}</pre>`);
+          return;
+        }
       }
 
       const first = parts[0];

@@ -2,6 +2,8 @@ const { promisify } = require('util');
 const { exec } = require('child_process');
 const si = require('systeminformation');
 const { escapeHtml, formatBytes, formatPercent } = require('../config/utils');
+const nodeManager = require('../lib/nodeManager');
+const nodeClient = require('../lib/nodeClient');
 
 const execAsync = promisify(exec);
 
@@ -56,7 +58,7 @@ async function getCurrentMemoryLine() {
 module.exports = {
   name: 'cleancache',
   description: 'Dọn cache an toàn và flush log PM2',
-  execute: async (ctx) => {
+  execute: async (ctx, config = {}, deps = {}) => {
     try {
       const text = ctx.message?.text || '';
       const args = text.trim().split(/\s+/).slice(1);
@@ -68,6 +70,28 @@ module.exports = {
           `<b>Ví dụ:</b> <code>/cleancache</code>`
         );
         return;
+      }
+
+      if (args[0] && args[0] !== 'all') {
+        const node = await (deps.nodeManager || nodeManager).getNode(args[0], config);
+        if (!node) { await ctx.replyWithHTML('⚠️ Node không tồn tại.'); return; }
+        if (!node.isLocal) {
+          const result = await (deps.nodeClient || nodeClient).cleanCache(node);
+          const detail = result.result || {};
+          await ctx.replyWithHTML(`🧹 <b>${escapeHtml(node.name || node.id)}</b>\nPM2: ${escapeHtml(detail.pm2Flush || result.error || 'N/A')}\nCache: ${escapeHtml(detail.cacheFreed || 'N/A')}`);
+          return;
+        }
+      }
+      if (args[0] === 'all') {
+        const nodes = await (deps.nodeManager || nodeManager).getNodes(config);
+        const remoteNodes = nodes.filter((node) => !node.isLocal);
+        const results = await Promise.all(remoteNodes.map(async (node) => {
+          try {
+            const result = await (deps.nodeClient || nodeClient).cleanCache(node);
+            return `${escapeHtml(node.name || node.id)}: ${result.ok ? 'OK' : escapeHtml(result.error || 'failed')}`;
+          } catch (err) { return `${escapeHtml(node.name || node.id)}: ${escapeHtml(err.message)}`; }
+        }));
+        if (results.length) await ctx.replyWithHTML(`<b>Worker nodes</b>\n${results.join('\n')}`);
       }
 
       const cacheCommand = process.platform === 'linux'

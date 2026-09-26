@@ -59,7 +59,7 @@ async function handleZipDeploy(ctx, zipName, target = 'vps', config, options = {
   }
 }
 
-async function handleGitDeploy(ctx, deployId, target, config) {
+async function handleGitDeploy(ctx, deployId, target, config, nodeId = 'gcp-master') {
   try {
     const pending = deployStore.getPending(deployId);
     if (!pending) {
@@ -126,6 +126,7 @@ async function handleGitDeploy(ctx, deployId, target, config) {
         projectName: pending.projectName,
         target,
         subdomain: pending.subdomain,
+        nodeId: target === 'vps' ? nodeId : undefined,
       },
       config
     );
@@ -292,12 +293,13 @@ module.exports = {
     });
 
     // 3. Khi xác nhận nền tảng cho GitHub Link
-    bot.action(/^git_target:([a-zA-Z0-9]+):([a-zA-Z0-9_-]+)$/, async (ctx) => {
+    bot.action(/^git_target:([a-zA-Z0-9]+):([a-zA-Z0-9_-]+)(?::([a-zA-Z0-9_-]+))?$/, async (ctx) => {
       try {
         await ctx.answerCbQuery('Bắt đầu triển khai GitHub...');
         const deployId = ctx.match[1];
         const target = ctx.match[2];
-        await handleGitDeploy(ctx, deployId, target, config);
+        const nodeId = ctx.match[3] || 'gcp-master';
+        await handleGitDeploy(ctx, deployId, target, config, nodeId);
       } catch (err) {
         console.error('[GIT_TARGET_ACTION_ERROR]', err);
         await ctx.reply('⚠️ Lỗi khi kích hoạt deploy từ GitHub.');
