@@ -159,7 +159,15 @@ async function testDeployer() {
         subdomain: 'v-app',
       },
       allConfig,
-      { vercel: mockVercel, cloudflare: mockCloudflare }
+      {
+        vercel: mockVercel,
+        cloudflare: mockCloudflare,
+        downloadGithubZip: async (_owner, _repo, destPath) => {
+          await fs.mkdir(path.dirname(destPath), { recursive: true });
+          await fs.writeFile(destPath, 'test fixture');
+          return destPath;
+        },
+      }
     );
 
     assert.strictEqual(vercelRes.ok, true);
