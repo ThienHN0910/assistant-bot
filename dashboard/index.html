@@ -66,6 +66,8 @@
 
   <!-- Vue 3 CDN -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Chart.js CDN (Zero-animation charts) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Google Identity Services (GIS) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
@@ -604,30 +606,47 @@
       </div>
 
       <!-- DASHBOARD TABS SWITCHER -->
-      <div class="flex items-center gap-2 border-b border-slate-800 pb-3 text-sm">
+      <div class="flex items-center gap-2 border-b border-slate-800 pb-3 text-sm overflow-x-auto">
         <button 
           @click="dashTab = 'telemetry'"
           :class="dashTab === 'telemetry' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
-          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2">
+          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 whitespace-nowrap">
           <span>🖥️</span>
-          <span>Giám sát VPS & Telemetry</span>
+          <span>Giám Sát & Biểu Đồ</span>
         </button>
 
         <button 
           @click="dashTab = 'deployments'"
           :class="dashTab === 'deployments' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
-          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2">
+          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 whitespace-nowrap">
           <span>🌐</span>
           <span>Danh Sách Dịch Vụ</span>
           <span class="text-xs px-2 py-0.5 rounded-full bg-slate-950 font-mono">{{ deployments.length }}</span>
         </button>
 
         <button 
+          @click="dashTab = 'operations'"
+          :class="dashTab === 'operations' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
+          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 whitespace-nowrap">
+          <span>⚙️</span>
+          <span>Tác Vụ & Terminal</span>
+        </button>
+
+        <button 
+          @click="dashTab = 'notes'; fetchNotes()"
+          :class="dashTab === 'notes' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
+          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 whitespace-nowrap">
+          <span>📝</span>
+          <span>Ghi Chú</span>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-950 font-mono">{{ notesList.length }}</span>
+        </button>
+
+        <button 
           @click="dashTab = 'commands'"
           :class="dashTab === 'commands' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
-          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2">
+          class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 whitespace-nowrap">
           <span>📋</span>
-          <span>Trung Tâm Lệnh Telegram</span>
+          <span>Tra Cứu Lệnh Telegram</span>
         </button>
       </div>
 
@@ -752,6 +771,57 @@
             <div v-if="node.error" class="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl flex items-center gap-2">
               <span>⚠️</span>
               <span>{{ node.error }}</span>
+            </div>
+
+            <!-- Diagnostic Quick Buttons (/ps & /logs) -->
+            <div class="flex items-center gap-2 pt-3 border-t border-slate-800/80 mt-1">
+              <button 
+                @click="openProcessesModal(node.id)"
+                class="flex-1 py-1.5 px-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-all">
+                <span>📊</span>
+                <span>Tiến Trình (/ps)</span>
+              </button>
+              <button 
+                @click="openLogsModal(node.id)"
+                class="flex-1 py-1.5 px-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition-all">
+                <span>🧾</span>
+                <span>Log Lỗi (/logs)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- REAL-TIME TELEMETRY CHARTS (CHART.JS - NO ANIMATION) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <!-- CPU Usage Chart -->
+          <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                  <span>📈</span> Tải CPU Thời Gian Thực (%)
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Biểu đồ đối sánh CPU giữa các node trong cụm (cập nhật tự động)</p>
+              </div>
+              <span class="text-[11px] font-mono px-2 py-0.5 bg-slate-950 border border-slate-800 text-slate-400 rounded-lg">Realtime</span>
+            </div>
+            <div class="h-64 relative w-full">
+              <canvas id="cpuChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Memory Usage Chart -->
+          <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                  <span>📊</span> Mức Sử Dụng RAM (%)
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Theo dõi giới hạn RAM nghiêm ngặt cho GCP Master và Oracle Worker</p>
+              </div>
+              <span class="text-[11px] font-mono px-2 py-0.5 bg-slate-950 border border-slate-800 text-slate-400 rounded-lg">Realtime</span>
+            </div>
+            <div class="h-64 relative w-full">
+              <canvas id="ramChart"></canvas>
             </div>
           </div>
         </div>
@@ -920,11 +990,22 @@
 
                 <!-- Actions -->
                 <td class="px-6 py-4 text-right">
-                  <button 
-                    @click="confirmUndeploy(dep.name)"
-                    class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-medium transition-all">
-                    Gỡ bỏ
-                  </button>
+                  <div class="flex items-center justify-end gap-2">
+                    <button 
+                      @click="openPerfModal(dep)"
+                      class="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
+                      title="Đo độ trễ và Google PageSpeed (/perf)">
+                      <span>⚡</span>
+                      <span>Đo Perf</span>
+                    </button>
+                    <button 
+                      @click="confirmUndeploy(dep.name)"
+                      class="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-medium flex items-center gap-1 transition-all"
+                      title="Gỡ bỏ dự án (/web_remove)">
+                      <span>🗑️</span>
+                      <span>Gỡ bỏ</span>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -932,7 +1013,219 @@
         </div>
       </section>
 
-      <!-- TAB 3: TELEGRAM COMMANDS HUB (Inside Dashboard) -->
+      <!-- TAB 3: OPERATIONS & SAFE WEB TERMINAL (/sh, /restart, /update, /cleancache) -->
+      <section v-if="dashTab === 'operations'" class="space-y-6">
+        <!-- Quick Operations Header -->
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+              <span>⚙️</span> Trung Tâm Tác Vụ & Web Terminal
+            </h2>
+            <p class="text-slate-400 text-xs mt-1">Thực hiện các thao tác vận hành từ xa: Khởi động lại PM2, cập nhật git, xả cache, và chạy lệnh shell an toàn.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400">Node mục tiêu:</label>
+            <select v-model="opsTargetNode" class="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500">
+              <option value="all">🌐 Tất cả các node (Cluster All)</option>
+              <option v-for="n in clusterNodes" :key="n.id" :value="n.id">
+                {{ n.isLocal ? '🖥️ ' : '☁️ ' }}{{ n.name }} ({{ n.ipMasked }})
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Operations Action Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- 1. Restart PM2 -->
+          <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between">
+            <div>
+              <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-2xl mb-4">
+                🔄
+              </div>
+              <h3 class="text-base font-bold text-white">Khởi Động Lại PM2 (/restart)</h3>
+              <p class="text-xs text-slate-400 mt-2">Khởi động lại tiến trình Node.js quản lý bot hoặc worker daemon một cách an toàn mà không làm gián đoạn máy chủ.</p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-800">
+              <button 
+                @click="triggerRestart"
+                :disabled="executingOp"
+                class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/20">
+                <span :class="{ 'animate-spin': executingOp && currentOpName === 'restart' }">🔄</span>
+                <span>Thực Thi /restart</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Clean Cache -->
+          <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between">
+            <div>
+              <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl mb-4">
+                🧹
+              </div>
+              <h3 class="text-base font-bold text-white">Xả Cache & Flush Logs (/cleancache)</h3>
+              <p class="text-xs text-slate-400 mt-2">Dọn dẹp pagecache RAM trên Linux và xóa sạch lịch sử log PM2 cũ để giải phóng dung lượng bộ nhớ.</p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-800">
+              <button 
+                @click="triggerCleanCache"
+                :disabled="executingOp"
+                class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/20">
+                <span :class="{ 'animate-spin': executingOp && currentOpName === 'cleancache' }">🧹</span>
+                <span>Thực Thi /cleancache</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. Git Update -->
+          <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between">
+            <div>
+              <div class="w-12 h-12 rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-2xl mb-4">
+                🚀
+              </div>
+              <h3 class="text-base font-bold text-white">Cập Nhật Git & Restart (/update)</h3>
+              <p class="text-xs text-slate-400 mt-2">Tự động kéo mã nguồn mới nhất từ nhánh main của GitHub, chạy cài đặt thư viện và khởi động lại.</p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-800">
+              <button 
+                @click="triggerUpdate"
+                :disabled="executingOp"
+                class="w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-lg shadow-brand-600/20">
+                <span :class="{ 'animate-spin': executingOp && currentOpName === 'update' }">🚀</span>
+                <span>Thực Thi /update</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Safe Whitelisted Shell Terminal (/sh) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-4">
+            <div>
+              <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <span>💻</span> Safe Whitelisted Terminal (/sh)
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">Chạy các câu lệnh shell an toàn từ whitelist hoặc lệnh từ xa tới worker node.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button 
+                @click="terminalOutput = ''"
+                class="px-3 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl text-xs transition-all">
+                Xóa Màn Hình
+              </button>
+            </div>
+          </div>
+
+          <!-- Command Input Row -->
+          <div class="flex flex-col sm:flex-row gap-3">
+            <!-- Node Selector -->
+            <select v-model="terminalNode" class="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 min-w-[140px]">
+              <option v-for="n in clusterNodes" :key="n.id" :value="n.id">
+                {{ n.isLocal ? '🖥️ ' : '☁️ ' }}{{ n.name }}
+              </option>
+            </select>
+
+            <!-- Quick Alias Dropdown -->
+            <select v-model="selectedAlias" @change="onAliasSelect" class="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500">
+              <option value="">-- Chọn Alias Whitelist --</option>
+              <option v-for="a in availableAliases" :key="a" :value="`/${a}`">/{{ a }}</option>
+            </select>
+
+            <!-- Custom Command Input -->
+            <input 
+              v-model="terminalCommand"
+              @keyup.enter="runTerminalCommand"
+              type="text" 
+              placeholder="Nhập câu lệnh (vd: /pm2-list, /git-status, /uptime...)" 
+              class="flex-1 px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+            />
+
+            <!-- Run Button -->
+            <button 
+              @click="runTerminalCommand"
+              :disabled="runningTerminal || !terminalCommand.trim()"
+              class="px-5 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-brand-600/20 whitespace-nowrap">
+              <span :class="{ 'animate-spin': runningTerminal }">⚡</span>
+              <span>Chạy Lệnh</span>
+            </button>
+          </div>
+
+          <!-- Terminal Output Screen -->
+          <div class="bg-black/90 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto min-h-[160px] max-h-[360px] text-slate-200">
+            <div class="text-slate-500 mb-2 border-b border-slate-800/80 pb-1 flex items-center justify-between">
+              <span>assistant-bot@{{ terminalNode || 'gcp-master' }}:~$ console</span>
+              <span v-if="runningTerminal" class="text-brand-400 animate-pulse">Đang thực thi...</span>
+            </div>
+            <pre v-if="terminalOutput" class="whitespace-pre-wrap break-all">{{ terminalOutput }}</pre>
+            <div v-else class="text-slate-600 italic">Chưa có kết quả lệnh. Chọn alias hoặc nhập câu lệnh rồi bấm "Chạy Lệnh".</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: NOTES MANAGER (/notes) -->
+      <section v-if="dashTab === 'notes'" class="space-y-6">
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+              <span>📝</span> Sổ Ghi Chú Cá Nhân (/notes)
+            </h2>
+            <p class="text-slate-400 text-xs mt-1">Đồng bộ hoàn toàn với lệnh /notes trên Telegram và tin nhắn thường gửi tới bot.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button 
+              @click="fetchNotes"
+              class="px-3 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-xl text-xs flex items-center gap-1.5 transition-all">
+              <span>🔄</span> Làm mới
+            </button>
+            <button 
+              @click="clearAllNotes"
+              class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs flex items-center gap-1.5 transition-all">
+              <span>🗑️</span> Xóa Toàn Bộ
+            </button>
+          </div>
+        </div>
+
+        <!-- Add Note Input Card -->
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl space-y-3">
+          <label class="block text-xs font-semibold text-slate-300">Thêm ghi chú mới:</label>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <input 
+              v-model="newNoteText" 
+              @keyup.enter="saveNote"
+              type="text" 
+              placeholder="Nhập nội dung ghi chú cần lưu..."
+              class="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+            />
+            <button 
+              @click="saveNote"
+              :disabled="savingNote || !newNoteText.trim()"
+              class="px-6 py-2.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-brand-600/20 whitespace-nowrap">
+              <span>💾</span>
+              <span>Lưu Ghi Chú</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Notes List -->
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+          <div class="p-4 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <span>Danh Sách Ghi Chú ({{ notesList.length }} mục)</span>
+            <span>Lưu trữ cục bộ: notes.txt</span>
+          </div>
+          <div v-if="notesList.length === 0" class="p-12 text-center text-slate-500 text-sm">
+            Chưa có ghi chú nào được lưu. Bạn có thể thêm ghi chú ở trên hoặc gửi tin nhắn văn bản cho Bot trên Telegram.
+          </div>
+          <ul v-else class="divide-y divide-slate-800">
+            <li v-for="(note, idx) in notesList" :key="idx" class="p-4 hover:bg-slate-800/40 transition-colors flex items-start gap-3">
+              <span class="text-base mt-0.5">📌</span>
+              <div class="flex-1 font-mono text-xs sm:text-sm text-slate-200 whitespace-pre-wrap break-words">
+                {{ note }}
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- TAB 5: TELEGRAM COMMANDS HUB (Inside Dashboard) -->
       <section v-if="dashTab === 'commands'" class="space-y-6">
         <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -1206,6 +1499,210 @@
               <span v-else>🚀 Bắt đầu Deploy</span>
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 3: PROCESSES VIEWER (/ps)                                       -->
+    <!-- ===================================================================== -->
+    <div v-if="showProcessesModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-xl">📊</div>
+            <div>
+              <h3 class="text-lg font-bold text-white">Top Tiến Trình (/ps)</h3>
+              <p class="text-xs text-slate-400">Xem top tiến trình tiêu thụ nhiều tài nguyên nhất</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <select v-model="processesSelectedNode" @change="fetchProcesses" class="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none">
+              <option v-for="n in clusterNodes" :key="n.id" :value="n.id">{{ n.name }}</option>
+            </select>
+            <button @click="fetchProcesses" :disabled="loadingProcesses" class="p-2 bg-slate-950 hover:bg-slate-800 text-slate-300 rounded-xl text-xs border border-slate-800">
+              <span :class="{ 'animate-spin': loadingProcesses }">🔄</span>
+            </button>
+            <button @click="showProcessesModal = false" class="text-slate-400 hover:text-white p-2">✕</button>
+          </div>
+        </div>
+
+        <div class="overflow-y-auto mt-4 flex-1">
+          <div v-if="loadingProcesses" class="py-12 text-center text-slate-400 text-xs">Đang tải danh sách tiến trình...</div>
+          <table v-else class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
+              <tr>
+                <th class="p-2.5">PID</th>
+                <th class="p-2.5">User</th>
+                <th class="p-2.5">Tên Tiến Trình</th>
+                <th class="p-2.5 text-right">RAM (%)</th>
+                <th class="p-2.5 text-right">CPU (%)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800">
+              <tr v-if="processesList.length === 0">
+                <td colspan="5" class="p-6 text-center text-slate-500">Không có tiến trình nào.</td>
+              </tr>
+              <tr v-for="p in processesList" :key="p.pid" class="hover:bg-slate-800/40">
+                <td class="p-2.5 text-slate-400">{{ p.pid }}</td>
+                <td class="p-2.5 text-slate-400">{{ p.user }}</td>
+                <td class="p-2.5 font-bold text-white">{{ p.name }}</td>
+                <td class="p-2.5 text-right text-emerald-400 font-semibold">{{ p.mem }}%</td>
+                <td class="p-2.5 text-right text-brand-400 font-semibold">{{ p.cpu }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 4: PM2 LOGS VIEWER (/logs)                                      -->
+    <!-- ===================================================================== -->
+    <div v-if="showLogsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-3xl w-full p-6 shadow-2xl relative flex flex-col max-h-[85vh]">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-xl">🧾</div>
+            <div>
+              <h3 class="text-lg font-bold text-white">PM2 Logs (/logs)</h3>
+              <p class="text-xs text-slate-400">Xem log lỗi thời gian thực từ tiến trình PM2</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <select v-model="logsSelectedNode" @change="fetchLogs" class="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none">
+              <option v-for="n in clusterNodes" :key="n.id" :value="n.id">{{ n.name }}</option>
+            </select>
+            <select v-model="logsLines" @change="fetchLogs" class="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none">
+              <option :value="20">20 dòng</option>
+              <option :value="50">50 dòng</option>
+              <option :value="100">100 dòng</option>
+            </select>
+            <button @click="fetchLogs" :disabled="loadingLogs" class="p-2 bg-slate-950 hover:bg-slate-800 text-slate-300 rounded-xl text-xs border border-slate-800">
+              <span :class="{ 'animate-spin': loadingLogs }">🔄</span>
+            </button>
+            <button @click="showLogsModal = false" class="text-slate-400 hover:text-white p-2">✕</button>
+          </div>
+        </div>
+
+        <div class="mt-4 flex-1 bg-black/90 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-y-auto max-h-[55vh]">
+          <div v-if="loadingLogs" class="text-slate-500 italic">Đang tải logs...</div>
+          <pre v-else class="text-slate-300 whitespace-pre-wrap break-all">{{ logsContent || 'Không có log lỗi.' }}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 5: PERF TEST MODAL (/perf)                                      -->
+    <!-- ===================================================================== -->
+    <div v-if="showPerfModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl relative">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xl">⚡</div>
+            <div>
+              <h3 class="text-lg font-bold text-white">Đo Hiệu Năng Website (/perf)</h3>
+              <p class="text-xs text-slate-400 font-mono">{{ perfTarget }}</p>
+            </div>
+          </div>
+          <button @click="showPerfModal = false" class="text-slate-400 hover:text-white p-2">✕</button>
+        </div>
+
+        <div class="mt-6 space-y-4">
+          <div v-if="loadingPerf" class="py-12 text-center text-slate-400 text-sm">
+            <span class="animate-spin text-2xl inline-block mb-2">⏱️</span>
+            <div>Đang đo độ trễ HTTP và điểm Google PageSpeed...</div>
+          </div>
+          <div v-else-if="perfResult" class="space-y-4">
+            <!-- Server Latency Breakdown -->
+            <div class="bg-slate-950 border border-slate-800 p-4 rounded-2xl">
+              <div class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3">Độ Trễ Phản Hồi Máy Chủ (Latency)</div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div class="p-2.5 rounded-xl bg-slate-900">
+                  <div class="text-[10px] text-slate-400">TTFB</div>
+                  <div class="font-mono font-bold text-emerald-400 text-sm mt-0.5">{{ perfResult.latency?.ttfbMs }} ms</div>
+                </div>
+                <div class="p-2.5 rounded-xl bg-slate-900">
+                  <div class="text-[10px] text-slate-400">DNS Lookup</div>
+                  <div class="font-mono font-bold text-slate-200 text-sm mt-0.5">{{ perfResult.latency?.dnsMs }} ms</div>
+                </div>
+                <div class="p-2.5 rounded-xl bg-slate-900">
+                  <div class="text-[10px] text-slate-400">TCP Connect</div>
+                  <div class="font-mono font-bold text-slate-200 text-sm mt-0.5">{{ perfResult.latency?.connectMs }} ms</div>
+                </div>
+                <div class="p-2.5 rounded-xl bg-slate-900">
+                  <div class="text-[10px] text-slate-400">Tổng Thời Gian</div>
+                  <div class="font-mono font-bold text-brand-400 text-sm mt-0.5">{{ perfResult.latency?.totalMs }} ms</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Google PageSpeed Score -->
+            <div class="bg-slate-950 border border-slate-800 p-4 rounded-2xl">
+              <div class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-3">Google PageSpeed / Lighthouse (Mobile)</div>
+              <div v-if="perfResult.pageSpeed?.ok" class="space-y-3">
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900">
+                  <span class="text-xs text-slate-300">Điểm Performance:</span>
+                  <span class="text-lg font-bold font-mono" :class="perfResult.pageSpeed.score >= 90 ? 'text-emerald-400' : (perfResult.pageSpeed.score >= 50 ? 'text-amber-400' : 'text-rose-400')">
+                    {{ perfResult.pageSpeed.score }} / 100
+                  </span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono">
+                  <div class="p-2 rounded-xl bg-slate-900">
+                    <div class="text-[10px] text-slate-400">FCP</div>
+                    <div class="text-slate-200 mt-0.5">{{ perfResult.pageSpeed.fcp }}</div>
+                  </div>
+                  <div class="p-2 rounded-xl bg-slate-900">
+                    <div class="text-[10px] text-slate-400">LCP</div>
+                    <div class="text-slate-200 mt-0.5">{{ perfResult.pageSpeed.lcp }}</div>
+                  </div>
+                  <div class="p-2 rounded-xl bg-slate-900">
+                    <div class="text-[10px] text-slate-400">TBT</div>
+                    <div class="text-slate-200 mt-0.5">{{ perfResult.pageSpeed.tbt }}</div>
+                  </div>
+                  <div class="p-2 rounded-xl bg-slate-900">
+                    <div class="text-[10px] text-slate-400">CLS</div>
+                    <div class="text-slate-200 mt-0.5">{{ perfResult.pageSpeed.cls }}</div>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-xs text-slate-400 italic">
+                {{ perfResult.pageSpeed?.reason || 'Chưa cấu hình PAGESPEED_API_KEY hoặc kiểm tra cục bộ.' }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 6: CONFIRM UNDEPLOY (/web_remove)                               -->
+    <!-- ===================================================================== -->
+    <div v-if="showUndeployModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-center">
+        <div class="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center text-2xl mx-auto mb-4">
+          🗑️
+        </div>
+        <h3 class="text-lg font-bold text-white">Xác Nhận Gỡ Bỏ Dịch Vụ</h3>
+        <p class="text-xs text-slate-400 mt-2">
+          Bạn có chắc chắn muốn gỡ bỏ hoàn toàn dự án <b class="text-white font-mono">{{ undeployTargetName }}</b>?
+        </p>
+        <p class="text-[11px] text-rose-400 mt-2 bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20">
+          Hành động này sẽ xóa thư mục dự án trên máy chủ và tự động hủy bản ghi DNS tương ứng trên Cloudflare.
+        </p>
+        <div class="flex items-center gap-3 mt-6">
+          <button 
+            @click="showUndeployModal = false"
+            class="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all">
+            Hủy Bỏ
+          </button>
+          <button 
+            @click="executeUndeploy"
+            :disabled="executingUndeploy"
+            class="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition-all shadow-lg shadow-rose-600/20 flex items-center justify-center gap-1.5">
+            <span :class="{ 'animate-spin': executingUndeploy }">🗑️</span>
+            <span>Xác Nhận Xóa</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1688,6 +2185,7 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
               system.value = sysRes.system;
               if (Array.isArray(sysRes.nodes)) {
                 clusterNodes.value = sysRes.nodes;
+                setTimeout(() => updateCharts(sysRes.nodes), 50);
               }
             }
             if (depRes?.ok) deployments.value = depRes.deployments;
@@ -1701,22 +2199,404 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           }
         }
 
-        async function confirmUndeploy(name) {
-          if (!confirm(`Bạn có chắc chắn muốn xóa dự án "${name}" không? Thao tác này sẽ giải phóng tài nguyên và thu hồi bản ghi DNS Cloudflare.`)) {
-            return;
+        // =====================================================================
+        // REAL-TIME METRICS CHARTS (CHART.JS - NO ANIMATION)
+        // =====================================================================
+        let cpuChartInstance = null;
+        let ramChartInstance = null;
+        const chartTimestamps = ref([]);
+        const chartHistory = {
+          cpu: {},
+          ram: {},
+        };
+
+        const NODE_COLORS = [
+          { border: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
+          { border: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)' },
+          { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
+          { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)' },
+        ];
+
+        function updateCharts(nodesList) {
+          if (!window.Chart || !nodesList || nodesList.length === 0) return;
+          const cpuCanvas = document.getElementById('cpuChart');
+          const ramCanvas = document.getElementById('ramChart');
+          if (!cpuCanvas || !ramCanvas) return;
+
+          const timeLabel = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+          chartTimestamps.value.push(timeLabel);
+          if (chartTimestamps.value.length > 12) chartTimestamps.value.shift();
+
+          nodesList.forEach((node) => {
+            if (!chartHistory.cpu[node.id]) chartHistory.cpu[node.id] = [];
+            if (!chartHistory.ram[node.id]) chartHistory.ram[node.id] = [];
+
+            chartHistory.cpu[node.id].push(Number(node.cpuLoad) || 0);
+            const ramPct = Number(node.memory?.usedPercentage) || 0;
+            chartHistory.ram[node.id].push(ramPct);
+
+            if (chartHistory.cpu[node.id].length > 12) chartHistory.cpu[node.id].shift();
+            if (chartHistory.ram[node.id].length > 12) chartHistory.ram[node.id].shift();
+          });
+
+          const cpuDatasets = nodesList.map((node, i) => {
+            const color = NODE_COLORS[i % NODE_COLORS.length];
+            return {
+              label: `${node.name} (%)`,
+              data: [...(chartHistory.cpu[node.id] || [])],
+              borderColor: color.border,
+              backgroundColor: color.bg,
+              fill: false,
+              tension: 0.1,
+              borderWidth: 2,
+              pointRadius: 3,
+            };
+          });
+
+          const ramDatasets = nodesList.map((node, i) => {
+            const color = NODE_COLORS[i % NODE_COLORS.length];
+            return {
+              label: `${node.name} (%)`,
+              data: [...(chartHistory.ram[node.id] || [])],
+              borderColor: color.border,
+              backgroundColor: color.bg,
+              fill: false,
+              tension: 0.1,
+              borderWidth: 2,
+              pointRadius: 3,
+            };
+          });
+
+          const chartOptions = {
+            animation: false,
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                min: 0,
+                max: 100,
+                ticks: { color: '#94a3b8', font: { family: 'monospace', size: 10 } },
+                grid: { color: 'rgba(51, 65, 85, 0.3)' },
+              },
+              x: {
+                ticks: { color: '#94a3b8', font: { family: 'monospace', size: 10 } },
+                grid: { color: 'rgba(51, 65, 85, 0.2)' },
+              },
+            },
+            plugins: {
+              legend: {
+                labels: { color: '#cbd5e1', font: { size: 11 } },
+              },
+            },
+          };
+
+          if (cpuChartInstance) {
+            cpuChartInstance.data.labels = [...chartTimestamps.value];
+            cpuChartInstance.data.datasets = cpuDatasets;
+            cpuChartInstance.update('none');
+          } else {
+            cpuChartInstance = new window.Chart(cpuCanvas, {
+              type: 'line',
+              data: { labels: [...chartTimestamps.value], datasets: cpuDatasets },
+              options: chartOptions,
+            });
           }
 
+          if (ramChartInstance) {
+            ramChartInstance.data.labels = [...chartTimestamps.value];
+            ramChartInstance.data.datasets = ramDatasets;
+            ramChartInstance.update('none');
+          } else {
+            ramChartInstance = new window.Chart(ramCanvas, {
+              type: 'line',
+              data: { labels: [...chartTimestamps.value], datasets: ramDatasets },
+              options: chartOptions,
+            });
+          }
+        }
+
+        // Processes Modal (/ps)
+        const showProcessesModal = ref(false);
+        const loadingProcesses = ref(false);
+        const processesSelectedNode = ref('gcp-master');
+        const processesList = ref([]);
+
+        async function openProcessesModal(nodeId = 'gcp-master') {
+          processesSelectedNode.value = nodeId;
+          showProcessesModal.value = true;
+          await fetchProcesses();
+        }
+
+        async function fetchProcesses() {
+          loadingProcesses.value = true;
+          try {
+            const res = await apiRequest(`/api/processes?nodeId=${processesSelectedNode.value}`);
+            if (res.ok) {
+              processesList.value = res.processes || [];
+            } else {
+              showToast(res.error || 'Lỗi tải tiến trình', 'error');
+            }
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            loadingProcesses.value = false;
+          }
+        }
+
+        // PM2 Logs Modal (/logs)
+        const showLogsModal = ref(false);
+        const loadingLogs = ref(false);
+        const logsSelectedNode = ref('gcp-master');
+        const logsLines = ref(20);
+        const logsContent = ref('');
+
+        async function openLogsModal(nodeId = 'gcp-master') {
+          logsSelectedNode.value = nodeId;
+          showLogsModal.value = true;
+          await fetchLogs();
+        }
+
+        async function fetchLogs() {
+          loadingLogs.value = true;
+          try {
+            const res = await apiRequest(`/api/logs?nodeId=${logsSelectedNode.value}&lines=${logsLines.value}`);
+            if (res.ok) {
+              logsContent.value = res.logs || 'Không có log lỗi.';
+            } else {
+              showToast(res.error || 'Lỗi tải log', 'error');
+            }
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            loadingLogs.value = false;
+          }
+        }
+
+        // Perf Modal (/perf)
+        const showPerfModal = ref(false);
+        const loadingPerf = ref(false);
+        const perfTarget = ref('');
+        const perfResult = ref(null);
+
+        async function openPerfModal(dep) {
+          perfTarget.value = dep.name || dep.url;
+          perfResult.value = null;
+          showPerfModal.value = true;
+          loadingPerf.value = true;
+          try {
+            const res = await apiRequest('/api/perf', {
+              method: 'POST',
+              body: JSON.stringify({ target: dep.name || dep.url }),
+            });
+            if (res.ok) {
+              perfResult.value = res.result;
+            } else {
+              showToast(res.error || 'Lỗi đo hiệu năng', 'error');
+            }
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            loadingPerf.value = false;
+          }
+        }
+
+        // Undeploy Modal (/web_remove)
+        const showUndeployModal = ref(false);
+        const executingUndeploy = ref(false);
+        const undeployTargetName = ref('');
+
+        function confirmUndeploy(name) {
+          undeployTargetName.value = name;
+          showUndeployModal.value = true;
+        }
+
+        async function executeUndeploy() {
+          if (!undeployTargetName.value) return;
+          executingUndeploy.value = true;
           try {
             const res = await apiRequest('/api/deployments/undeploy', {
               method: 'POST',
-              body: JSON.stringify({ name })
+              body: JSON.stringify({ name: undeployTargetName.value })
             });
 
             if (res.ok) {
-              showToast(`Đã gỡ bỏ thành công dự án "${name}"`);
+              showToast(`Đã gỡ bỏ thành công dự án "${undeployTargetName.value}"`);
+              showUndeployModal.value = false;
               fetchData();
             } else {
               showToast(res.error || 'Lỗi khi gỡ bỏ dự án', 'error');
+            }
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            executingUndeploy.value = false;
+          }
+        }
+
+        // Operations Hub (/restart, /cleancache, /update, /sh)
+        const opsTargetNode = ref('all');
+        const executingOp = ref(false);
+        const currentOpName = ref('');
+
+        async function triggerRestart() {
+          if (!confirm(`Bạn có chắc chắn muốn khởi động lại PM2 trên [${opsTargetNode.value}]?`)) return;
+          executingOp.value = true;
+          currentOpName.value = 'restart';
+          try {
+            const res = await apiRequest('/api/restart', {
+              method: 'POST',
+              body: JSON.stringify({ nodeId: opsTargetNode.value }),
+            });
+            if (res.ok) {
+              showToast(res.message || 'Đã kích hoạt khởi động lại PM2');
+            } else {
+              showToast(res.message || res.error || 'Lỗi khởi động lại', 'error');
+            }
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            executingOp.value = false;
+            currentOpName.value = '';
+          }
+        }
+
+        async function triggerCleanCache() {
+          executingOp.value = true;
+          currentOpName.value = 'cleancache';
+          try {
+            const res = await apiRequest('/api/cleancache', {
+              method: 'POST',
+              body: JSON.stringify({ nodeId: opsTargetNode.value }),
+            });
+            if (res.ok) {
+              showToast('Đã xả cache RAM & flush log PM2 thành công!');
+              fetchData();
+            } else {
+              showToast(res.error || 'Lỗi xả cache', 'error');
+            }
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            executingOp.value = false;
+            currentOpName.value = '';
+          }
+        }
+
+        async function triggerUpdate() {
+          if (!confirm(`Bắt đầu chạy /update trên [${opsTargetNode.value}]? (Quá trình có thể mất ~30 giây)`)) return;
+          executingOp.value = true;
+          currentOpName.value = 'update';
+          try {
+            const res = await apiRequest('/api/update', {
+              method: 'POST',
+              body: JSON.stringify({ nodeId: opsTargetNode.value }),
+            });
+            if (res.ok) {
+              showToast('Cập nhật thành công!');
+              terminalOutput.value = typeof res.output === 'string' ? res.output : JSON.stringify(res.output, null, 2);
+            } else {
+              showToast(res.error || 'Lỗi cập nhật', 'error');
+              terminalOutput.value = res.output || res.error || 'Thất bại';
+            }
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            executingOp.value = false;
+            currentOpName.value = '';
+          }
+        }
+
+        // Web Whitelisted Terminal (/sh)
+        const terminalNode = ref('gcp-master');
+        const availableAliases = ref(['pm2-list', 'git-status', 'disk-usage', 'uptime', 'netstat-listen', 'pm2-restart assistant-bot', 'update', 'cleancache']);
+        const selectedAlias = ref('');
+        const terminalCommand = ref('');
+        const terminalOutput = ref('');
+        const runningTerminal = ref(false);
+
+        function onAliasSelect() {
+          if (selectedAlias.value) {
+            terminalCommand.value = selectedAlias.value;
+          }
+        }
+
+        async function fetchAliases() {
+          try {
+            const res = await fetch('/api/sh/aliases').then((r) => r.json());
+            if (res.ok && Array.isArray(res.aliases)) {
+              availableAliases.value = res.aliases;
+            }
+          } catch {}
+        }
+
+        async function runTerminalCommand() {
+          if (!terminalCommand.value.trim()) return;
+          runningTerminal.value = true;
+          try {
+            const res = await apiRequest('/api/sh', {
+              method: 'POST',
+              body: JSON.stringify({
+                command: terminalCommand.value.trim(),
+                nodeId: terminalNode.value,
+              }),
+            });
+            if (res.ok) {
+              terminalOutput.value = res.output || 'Lệnh thực thi thành công (không có đầu ra)';
+            } else {
+              terminalOutput.value = `❌ Lỗi: ${res.error || res.output || 'Lệnh thất bại'}`;
+            }
+          } catch (err) {
+            terminalOutput.value = `❌ Lỗi kết nối: ${err.message}`;
+          } finally {
+            runningTerminal.value = false;
+          }
+        }
+
+        // Notes Manager (/notes)
+        const notesList = ref([]);
+        const newNoteText = ref('');
+        const savingNote = ref(false);
+
+        async function fetchNotes() {
+          try {
+            const res = await apiRequest('/api/notes');
+            if (res.ok && Array.isArray(res.notes)) {
+              notesList.value = res.notes;
+            }
+          } catch {}
+        }
+
+        async function saveNote() {
+          if (!newNoteText.value.trim()) return;
+          savingNote.value = true;
+          try {
+            const res = await apiRequest('/api/notes', {
+              method: 'POST',
+              body: JSON.stringify({ text: newNoteText.value.trim() }),
+            });
+            if (res.ok) {
+              showToast('Đã lưu ghi chú thành công!');
+              newNoteText.value = '';
+              fetchNotes();
+            } else {
+              showToast(res.error || 'Không thể lưu ghi chú', 'error');
+            }
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            savingNote.value = false;
+          }
+        }
+
+        async function clearAllNotes() {
+          if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ danh sách ghi chú?')) return;
+          try {
+            const res = await apiRequest('/api/notes', { method: 'DELETE' });
+            if (res.ok) {
+              showToast('Đã xóa toàn bộ ghi chú');
+              fetchNotes();
+            } else {
+              showToast(res.error || 'Lỗi khi xóa ghi chú', 'error');
             }
           } catch (err) {
             showToast(err.message, 'error');
@@ -1889,6 +2769,8 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           verifySession();
           initGoogleAuth();
           fetchNodes();
+          fetchAliases();
+          fetchNotes();
         });
 
         return {
@@ -1921,7 +2803,6 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           filteredCommands,
           fetchData,
           fetchNodes,
-          confirmUndeploy,
           showDeployModal,
           inspectingRepo,
           deploying,
@@ -1934,6 +2815,62 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           getNodeBadgeLabel,
           formatDate,
           logout,
+
+          // Diagnostic Modals (/ps & /logs)
+          showProcessesModal,
+          loadingProcesses,
+          processesSelectedNode,
+          processesList,
+          openProcessesModal,
+          fetchProcesses,
+          showLogsModal,
+          loadingLogs,
+          logsSelectedNode,
+          logsLines,
+          logsContent,
+          openLogsModal,
+          fetchLogs,
+
+          // Perf Modal (/perf)
+          showPerfModal,
+          loadingPerf,
+          perfTarget,
+          perfResult,
+          openPerfModal,
+
+          // Undeploy Modal (/web_remove)
+          showUndeployModal,
+          executingUndeploy,
+          undeployTargetName,
+          confirmUndeploy,
+          executeUndeploy,
+
+          // Operations Hub (/restart, /cleancache, /update)
+          opsTargetNode,
+          executingOp,
+          currentOpName,
+          triggerRestart,
+          triggerCleanCache,
+          triggerUpdate,
+
+          // Safe Whitelisted Web Terminal (/sh)
+          terminalNode,
+          availableAliases,
+          selectedAlias,
+          terminalCommand,
+          terminalOutput,
+          runningTerminal,
+          onAliasSelect,
+          fetchAliases,
+          runTerminalCommand,
+
+          // Notes Manager (/notes)
+          notesList,
+          newNoteText,
+          savingNote,
+          fetchNotes,
+          saveNote,
+          clearAllNotes,
         };
       }
     }).mount('#app');
