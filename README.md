@@ -88,7 +88,7 @@ Tham khảo mẫu hoàn chỉnh tại [`.env.example`](.env.example):
 | `RENDER_API_KEY` | API Key của Render (deploy Render) | Không | `rnd_*` |
 | `RENDER_OWNER_ID` | Owner / Team ID của Render | Không | `usr_*` |
 | `PM2_PROCESS_NAME` | Tên tiến trình PM2 của bot | Không | `assistant-bot` |
-| `WEB_DEPLOY_DIR` | Thư mục lưu mã nguồn web deploy trên VPS | Không | `/var/www` |
+| `WEB_DEPLOY_DIR` | Thư mục lưu mã nguồn web deploy trên VPS | Không | `~/web` (`/home/hnt/web`) |
 | `UPLOAD_DIR` | Thư mục nhận file zip upload | Không | `/home/hnt/uploads` |
 | `PAGESPEED_API_KEY` | Google PageSpeed Insights API Key cho lệnh `/perf` | Không | *(Google API Key)* |
 

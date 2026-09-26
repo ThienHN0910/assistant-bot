@@ -17,34 +17,40 @@ module.exports = {
 
       const lines = [];
       lines.push('<b>👋 Chào mừng đến với Dev Assistant Bot</b>');
-      lines.push('🤖 Bot trợ lý cá nhân dành cho lập trình viên!');
+      lines.push('🤖 <i>Trợ lý điều hành lập trình viên & cụm Multi-VPS thông minh!</i>');
       lines.push('');
-      lines.push('<b>📋 Danh sách lệnh:</b>');
-      lines.push('• /start - Hiển thị menu hướng dẫn');
-      lines.push('• /status - Xem tài nguyên server realtime');
+      lines.push('💡 <i>Mẹo: Thêm <code>-h</code> sau bất kỳ lệnh nào (vd: <code>/perf -h</code>, <code>/update -h</code>) để xem hướng dẫn chi tiết & ví dụ.</i>');
+      lines.push('');
+      lines.push('<b>🖥️ GIÁM SÁT & CỤM SERVER:</b>');
+      lines.push('• /status - Giám sát tài nguyên thời gian thực tất cả VPS');
+      lines.push('• /nodes - Quản lý danh sách máy chủ cụm Multi-VPS');
       lines.push('• /ps - Xem top 5 tiến trình ngốn RAM & CPU');
-      lines.push('• /ip - Lấy IP public hiện tại');
+      lines.push('• /uptime - Thời gian hoạt động của máy chủ');
       lines.push('• /logs - Xem 20 dòng log lỗi PM2 gần nhất (OOM-safe)');
-      lines.push('• /uptime - Xem thời gian uptime của server');
-      lines.push('• /cleancache - Dọn cache an toàn và flush log PM2');
-      lines.push('• /notes - Xem 10 ghi chú gần nhất (hoặc /notes clear)');
-      lines.push('• /deploy - Triển khai web test từ file ZIP (1 chạm)');
-      lines.push('• /web_list - Xem danh sách web test đang host');
-      lines.push('• /web_remove - Gỡ bỏ web test khỏi server');
-      lines.push('• /perf - Đo độ trễ TTFB và điểm Google PageSpeed');
-      lines.push('• /restart - Khởi động lại bot từ xa qua PM2 an toàn');
-      lines.push('• /update - Tự động cập nhật mã nguồn bot và khởi động lại');
-      lines.push('• /sh - Chạy lệnh shell theo whitelist an toàn');
+      lines.push('• /ip - Lấy địa chỉ IP public của cụm server');
       lines.push('');
-      lines.push('<b>📝 Snippet ghi chú:</b>');
-      lines.push('Gửi text thường (không bắt đầu bằng /) để lưu vào <code>notes.txt</code>.');
+      lines.push('<b>🌐 TRIỂN KHAI & QUẢN LÝ WEB:</b>');
+      lines.push('• /web_list - Xem danh sách web test đang chạy & máy chủ');
+      lines.push('• /deploy - Triển khai web 1 chạm (từ ZIP hoặc link GitHub)');
+      lines.push('• /web_remove - Gỡ bỏ web an toàn & thu hồi DNS');
+      lines.push('• /perf - Đo độ trễ TTFB & điểm Google PageSpeed');
+      lines.push('');
+      lines.push('<b>⚙️ HỆ THỐNG & ĐIỀU HÀNH:</b>');
+      lines.push('• /restart - Khởi động lại bot/agent qua PM2 an toàn');
+      lines.push('• /update - Tự động cập nhật code từ GitHub & khởi động lại');
+      lines.push('• /cleancache - Xả RAM buffer/cache & flush log PM2');
+      lines.push('• /sh - Chạy lệnh shell an toàn theo whitelist');
+      lines.push('• /notes - Xem 10 ghi chú gần nhất (hoặc <code>/notes clear</code>)');
+      lines.push('');
+      lines.push('<b>📝 Ghi chú nhanh:</b>');
+      lines.push('Gửi tin nhắn thường (không bắt đầu bằng <code>/</code>) để lưu vào <code>notes.txt</code>.');
 
       const options = {
         parse_mode: 'HTML',
         reply_markup: {
           keyboard: [
-            [{ text: '/status' }, { text: '/ps' }, { text: '/uptime' }],
-            [{ text: '/deploy' }, { text: '/web_list' }, { text: '/perf -h' }],
+            [{ text: '/status' }, { text: '/nodes' }, { text: '/ps' }, { text: '/uptime' }],
+            [{ text: '/web_list' }, { text: '/deploy' }, { text: '/perf -h' }],
             [{ text: '/logs' }, { text: '/cleancache' }, { text: '/notes' }],
             [{ text: '/restart' }, { text: '/update' }, { text: '/sh -h' }],
           ],
