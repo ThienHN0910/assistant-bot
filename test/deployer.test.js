@@ -429,6 +429,57 @@ async function testDeployer() {
     assert.strictEqual(failedOnlyRemoved, true);
     assert.deepStrictEqual(await deployer.loadRegistry(failedOnly.deployRegistryPath), []);
 
+    const cleanupPendingConfig = {
+      ...vpsConfig,
+      deployRegistryPath: path.join(testRoot, 'cleanup-pending.json'),
+    };
+    const cleanupEntry = {
+      id: 'test2', name: 'test2', target: 'vps', nodeId: 'oracle-worker',
+      domain: 'test2.thienhn.io.vn', status: 'cleanup_pending',
+      dnsOwnershipTag: 'assistant-bot:test2-owner',
+    };
+    const remoteNode = { id: 'oracle-worker', isLocal: false };
+    let remoteCleanupCalls = 0;
+    const remoteCleanup = {
+      nodeManager: { getNode: async () => remoteNode },
+      nodeClient: { undeploy: async () => { remoteCleanupCalls += 1; return { ok: true }; } },
+    };
+    await deployer.saveRegistry(cleanupPendingConfig.deployRegistryPath, [cleanupEntry]);
+    const missingDnsCleanup = await deployer.undeploy('test2', cleanupPendingConfig, {
+      ...remoteCleanup,
+      cloudflare: { isEnabled: () => true, findDnsRecord: async () => null },
+    });
+    assert.strictEqual(missingDnsCleanup.dnsDeleted, false);
+    assert.strictEqual(remoteCleanupCalls, 1);
+    assert.deepStrictEqual(await deployer.loadRegistry(cleanupPendingConfig.deployRegistryPath), []);
+
+    await deployer.saveRegistry(cleanupPendingConfig.deployRegistryPath, [cleanupEntry]);
+    await assert.rejects(
+      deployer.undeploy('test2', cleanupPendingConfig, {
+        ...remoteCleanup,
+        cloudflare: {
+          isEnabled: () => true,
+          findDnsRecord: async () => ({ id: 'manual-record', type: 'A', comment: 'manual' }),
+        },
+      }),
+      /no owned DNS record ID/
+    );
+    assert.strictEqual(remoteCleanupCalls, 1, 'unowned DNS record blocks origin cleanup');
+    assert.strictEqual((await deployer.loadRegistry(cleanupPendingConfig.deployRegistryPath))[0].status, 'cleanup_pending');
+
+    let deletedOwnedRecord = null;
+    const ownedDnsCleanup = await deployer.undeploy('test2', cleanupPendingConfig, {
+      ...remoteCleanup,
+      cloudflare: {
+        isEnabled: () => true,
+        findDnsRecord: async () => ({ id: 'owned-record', type: 'A', comment: cleanupEntry.dnsOwnershipTag }),
+        deleteDnsRecord: async ({ recordId }) => { deletedOwnedRecord = recordId; return { ok: true, deleted: true }; },
+      },
+    });
+    assert.strictEqual(ownedDnsCleanup.dnsDeleted, true);
+    assert.strictEqual(deletedOwnedRecord, 'owned-record');
+    assert.deepStrictEqual(await deployer.loadRegistry(cleanupPendingConfig.deployRegistryPath), []);
+
     let legacyRemoved = false;
     const legacyOnly = { ...vpsConfig, deployRegistryPath: path.join(testRoot, 'legacy-only.json') };
     const legacySandbox = {
