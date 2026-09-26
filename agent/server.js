@@ -26,12 +26,33 @@ function validateWorkerConfig(env = process.env) {
 const DEFAULT_MAX_JSON_BYTES = 1024 * 1024; // 1MB
 const DEFAULT_MAX_ZIP_BYTES = 50 * 1024 * 1024; // 50MB
 const EXEC_COMMANDS = new Map([
-  ['df -h', ['df', ['-h']]], ['free -m', ['free', ['-m']]],
-  ['uptime', ['uptime', []]], ['whoami', ['whoami', []]],
-  ['hostname', ['hostname', []]], ['git status', ['git', ['status']]],
+  ['df -h', ['df', ['-h']]],
+  ['disk-usage', ['df', ['-h']]],
+  ['free -m', ['free', ['-m']]],
+  ['free -h', ['free', ['-h']]],
+  ['mem-check', ['free', ['-h']]],
+  ['uptime', ['uptime', []]],
+  ['whoami', ['whoami', []]],
+  ['hostname', ['hostname', []]],
+  ['lscpu', ['lscpu', []]],
+  ['cpu-info', ['lscpu', []]],
+  ['cat /etc/os-release', ['cat', ['/etc/os-release']]],
+  ['os-release', ['cat', ['/etc/os-release']]],
+  ['ss -tuln', ['ss', ['-tuln']]],
+  ['netstat-listen', ['ss', ['-tuln']]],
+  ['ps aux --sort=-%mem', ['ps', ['aux', '--sort=-%mem']]],
+  ['top-procs', ['ps', ['aux', '--sort=-%mem']]],
+  ['git status', ['git', ['status']]],
+  ['git-status', ['git', ['status']]],
   ['git log --oneline -5', ['git', ['log', '--oneline', '-5']]],
-  ['pm2 list', ['pm2', ['list']]], ['pm2 status', ['pm2', ['status']]],
-  ['nginx -t', ['nginx', ['-t']]], ['cat /proc/meminfo', ['cat', ['/proc/meminfo']]],
+  ['git-log', ['git', ['log', '--oneline', '-5']]],
+  ['pm2 list', ['pm2', ['list']]],
+  ['pm2-list', ['pm2', ['list']]],
+  ['pm2 status', ['pm2', ['status']]],
+  ['pm2-status', ['pm2', ['status']]],
+  ['nginx -t', ['nginx', ['-t']]],
+  ['nginx-test', ['nginx', ['-t']]],
+  ['cat /proc/meminfo', ['cat', ['/proc/meminfo']]],
 ]);
 
 function sendJson(res, statusCode, data) {
@@ -250,8 +271,23 @@ function createAgentServer(options = {}) {
     if (pathname === '/api/exec' && req.method === 'POST') {
       try {
         const body = await parseJsonBody(req, Math.min(maxJsonBytes, 4096));
-        const command = typeof body.command === 'string' ? body.command.trim() : '';
-        const entry = EXEC_COMMANDS.get(command);
+        const rawCommand = typeof body.command === 'string' ? body.command.trim() : '';
+        const command = rawCommand.replace(/^\//, '').trim();
+        let entry = EXEC_COMMANDS.get(command) || EXEC_COMMANDS.get(rawCommand);
+
+        if (!entry) {
+          const parts = command.split(/\s+/);
+          const base = parts[0];
+          const allowedApps = ['assistant-bot', 'app', 'server', 'worker', 'all'];
+          if ((base === 'pm2-restart' || (base === 'pm2' && parts[1] === 'restart')) && allowedApps.includes(parts[base === 'pm2' ? 2 : 1])) {
+            const targetApp = parts[base === 'pm2' ? 2 : 1];
+            entry = ['pm2', ['restart', targetApp]];
+          } else if ((base === 'pm2-logs' || (base === 'pm2' && parts[1] === 'logs')) && allowedApps.includes(parts[base === 'pm2' ? 2 : 1])) {
+            const targetApp = parts[base === 'pm2' ? 2 : 1];
+            entry = ['pm2', ['logs', targetApp, '--lines', '30', '--nostream']];
+          }
+        }
+
         if (!entry) { sendJson(res, 403, { ok: false, error: 'Command not allowed' }); return; }
         const result = await sandbox.runCmd(entry[0], entry[1], { timeout: 10000, maxBuffer: 64 * 1024 });
         sendJson(res, result.ok ? 200 : 500, result);

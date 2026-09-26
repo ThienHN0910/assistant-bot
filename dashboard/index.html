@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚀%3C/text%3E%3C/svg%3E">
 
   <!-- SEO Optimization -->
   <title>DevOps Dashboard | Assistant Bot & Cloud Sandbox</title>
@@ -1118,20 +1120,34 @@
           <!-- Command Input Row -->
           <div class="flex flex-col sm:flex-row gap-3">
             <!-- Node Selector -->
-            <select v-model="terminalNode" class="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 min-w-[140px]">
+            <select 
+              id="terminal-node-select"
+              name="terminalNode"
+              aria-label="Chọn máy chủ thực thi"
+              v-model="terminalNode" 
+              class="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500 min-w-[140px]">
               <option v-for="n in clusterNodes" :key="n.id" :value="n.id">
                 {{ n.isLocal ? '🖥️ ' : '☁️ ' }}{{ n.name }}
               </option>
             </select>
 
             <!-- Quick Alias Dropdown -->
-            <select v-model="selectedAlias" @change="onAliasSelect" class="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500">
+            <select 
+              id="terminal-alias-select"
+              name="terminalAlias"
+              aria-label="Chọn lệnh whitelist có sẵn"
+              v-model="selectedAlias" 
+              @change="onAliasSelect" 
+              class="px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-brand-500">
               <option value="">-- Chọn Alias Whitelist --</option>
               <option v-for="a in availableAliases" :key="a" :value="`/${a}`">/{{ a }}</option>
             </select>
 
             <!-- Custom Command Input -->
             <input 
+              id="terminal-command-input"
+              name="terminalCommand"
+              aria-label="Nhập câu lệnh thực thi"
               v-model="terminalCommand"
               @keyup.enter="runTerminalCommand"
               type="text" 
@@ -1139,21 +1155,37 @@
               class="flex-1 px-4 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
             />
 
-            <!-- Run Button -->
-            <button 
-              @click="runTerminalCommand"
-              :disabled="runningTerminal || !terminalCommand.trim()"
-              class="px-5 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-brand-600/20 whitespace-nowrap">
-              <span :class="{ 'animate-spin': runningTerminal }">⚡</span>
-              <span>Chạy Lệnh</span>
-            </button>
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2">
+              <button 
+                id="btn-run-terminal"
+                @click="runTerminalCommand"
+                :disabled="runningTerminal || !terminalCommand.trim()"
+                class="px-5 py-2 bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-brand-600/20 whitespace-nowrap">
+                <span :class="{ 'animate-spin': runningTerminal }">⚡</span>
+                <span>Chạy Lệnh</span>
+              </button>
+
+              <button 
+                id="btn-clear-terminal"
+                @click="terminalOutput = ''"
+                :disabled="!terminalOutput"
+                title="Xóa màn hình console"
+                class="px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 hover:text-white rounded-xl text-xs font-medium flex items-center justify-center gap-1 transition-all whitespace-nowrap">
+                <span>🧹</span>
+                <span>Xóa</span>
+              </button>
+            </div>
           </div>
 
           <!-- Terminal Output Screen -->
           <div class="bg-black/90 border border-slate-800 rounded-2xl p-4 font-mono text-xs overflow-x-auto min-h-[160px] max-h-[360px] text-slate-200">
             <div class="text-slate-500 mb-2 border-b border-slate-800/80 pb-1 flex items-center justify-between">
               <span>assistant-bot@{{ terminalNode || 'gcp-master' }}:~$ console</span>
-              <span v-if="runningTerminal" class="text-brand-400 animate-pulse">Đang thực thi...</span>
+              <div class="flex items-center gap-3">
+                <span v-if="runningTerminal" class="text-brand-400 animate-pulse">Đang thực thi...</span>
+                <button v-if="terminalOutput" @click="terminalOutput = ''" class="text-slate-500 hover:text-slate-300 text-[10px] transition-colors">xóa output</button>
+              </div>
             </div>
             <pre v-if="terminalOutput" class="whitespace-pre-wrap break-all">{{ terminalOutput }}</pre>
             <div v-else class="text-slate-600 italic">Chưa có kết quả lệnh. Chọn alias hoặc nhập câu lệnh rồi bấm "Chạy Lệnh".</div>

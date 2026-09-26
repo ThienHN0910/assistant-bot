@@ -31,7 +31,7 @@ function testNoShellInterpolatedAliases() {
   assert.throws(() => whitelist.getCommands('pm2-restart', ['app;id']), /App not allowed/);
   assert.throws(() => whitelist.getCommands('git-status', ['extra']), /argument/i);
   for (const alias of whitelist.listAliases()) {
-    const args = alias === 'pm2-restart' ? ['assistant-bot'] : [];
+    const args = config.aliases[alias]?.argName ? ['assistant-bot'] : [];
     for (const step of whitelist.getCommands(alias, args)) {
       assert(!['bash', 'sh', 'cmd', 'powershell'].includes(step.cmd.toLowerCase()));
     }
