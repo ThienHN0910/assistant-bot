@@ -497,6 +497,22 @@ async function runTests() {
     });
     assert.ok(removeSymlinkCommands.some((c) => c[2] === 'rm' && c[4] === testEnabledPath), 'Symlink removed from sites-enabled');
     assert.ok(removeSymlinkCommands.some((c) => c[2] === 'rm' && c[4] === testAvailPath), 'Config removed from sites-available');
+
+    // Test restartSelf passes 100M limit and update-env
+    let restartArgs = null;
+    agentSandbox.restartSelf({
+      execFile: (cmd, args) => {
+        restartArgs = { cmd, args };
+      },
+    });
+    assert.strictEqual(restartArgs.cmd, 'pm2');
+    assert.deepStrictEqual(restartArgs.args, [
+      'restart',
+      'assistant-node-agent',
+      '--update-env',
+      '--max-memory-restart',
+      '100M',
+    ]);
   } finally {
     await fs.rm(temp, { recursive: true, force: true });
   }
