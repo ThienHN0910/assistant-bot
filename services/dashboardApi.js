@@ -187,15 +187,38 @@ function createDashboardServer(config, deps = {}) {
     const urlObj = new URL(req.url, 'http://localhost');
     const pathname = urlObj.pathname;
 
-    // 0. Serve Dashboard UI index.html (public)
-    if ((pathname === '/' || pathname === '/index.html') && req.method === 'GET') {
-      try {
-        const htmlPath = path.resolve(__dirname, '../dashboard/index.html');
-        const html = await fs.readFile(htmlPath, 'utf8');
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(html);
-        return;
-      } catch (err) {
+    // 0. Serve Dashboard UI static files (public)
+    if (req.method === 'GET' && !pathname.startsWith('/api/')) {
+      const safePath = pathname === '/' ? '/index.html' : pathname;
+      const dashboardDir = path.resolve(__dirname, '../dashboard');
+      const targetPath = path.resolve(dashboardDir, '.' + safePath);
+
+      // Path traversal security check
+      if (targetPath.startsWith(dashboardDir)) {
+        try {
+          const stats = await fs.stat(targetPath);
+          if (stats.isFile()) {
+            const ext = path.extname(targetPath).toLowerCase();
+            const mimeMap = {
+              '.html': 'text/html; charset=utf-8',
+              '.js': 'application/javascript; charset=utf-8',
+              '.css': 'text/css; charset=utf-8',
+              '.json': 'application/json; charset=utf-8',
+              '.png': 'image/png',
+              '.ico': 'image/x-icon',
+              '.svg': 'image/svg+xml'
+            };
+            const contentType = mimeMap[ext] || 'application/octet-stream';
+            const content = await fs.readFile(targetPath);
+            res.writeHead(200, { 'Content-Type': contentType });
+            res.end(content);
+            return;
+          }
+        } catch {
+          // File not found, continue
+        }
+      }
+      if (pathname === '/' || pathname === '/index.html') {
         sendJson(res, 500, { ok: false, error: 'Dashboard UI HTML file not found' });
         return;
       }

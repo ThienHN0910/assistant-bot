@@ -266,6 +266,13 @@ async function testDashboardApi() {
     assert(rootRes.data.includes('DevOps Dashboard'));
     console.log('✅ dashboardApi GET / serves index.html test passed');
 
+    // 12b. GET /app.js serves dashboard/app.js
+    const appJsRes = await client.get('/app.js');
+    assert.strictEqual(appJsRes.status, 200);
+    assert(appJsRes.headers['content-type'].includes('application/javascript'));
+    assert(appJsRes.data.includes('createApp'));
+    console.log('✅ dashboardApi GET /app.js serves app.js test passed');
+
     // 13. POST /api/deployments/inspect endpoint
     const inspectRes = await client.post(
       '/api/deployments/inspect',
