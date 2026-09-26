@@ -109,10 +109,26 @@ async function runTests() {
     }),
   };
 
+  const mockWhitelist = {
+    getCommands: (alias, args) => {
+      if (alias === 'pm2-list') return [{ cmd: 'pm2', args: ['list'] }];
+      throw new Error(`Alias không hợp lệ: ${alias}`);
+    },
+    listAliases: () => ['pm2-list', 'git-status'],
+  };
+
+  const mockRunner = {
+    runSequence: async (commands) => [
+      { ok: true, stdout: 'Mock runner success\n', stderr: '', code: 0 },
+    ],
+  };
+
   const server = createDashboardServer(mockConfig, {
     nodeManager: mockNodeManager,
     nodeClient: mockNodeClient,
     si: mockSi,
+    whitelist: mockWhitelist,
+    runner: mockRunner,
   });
 
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -183,8 +199,115 @@ async function runTests() {
     assert.strictEqual(res.data.ok, true);
     assert.strictEqual(res.data.node.id, 'oracle-worker');
     assert.ok(res.data.logs.includes('Worker log tail of 50 lines'));
-
     console.log('✅ Task 1 diagnostic tests passed!');
+
+    console.log('--- Testing /api/cleancache ---');
+    // Local cleancache
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/cleancache',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { nodeId: 'gcp-master' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+
+    // Remote cleancache
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/cleancache',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { nodeId: 'oracle-worker' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+    assert.strictEqual(res.data.result.pm2Flush, 'flushed');
+
+    console.log('--- Testing /api/restart ---');
+    // Remote restart
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/restart',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { nodeId: 'oracle-worker' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+
+    // Local restart
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/restart',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { nodeId: 'gcp-master' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+
+    console.log('--- Testing /api/update ---');
+    // Remote update
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/update',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { nodeId: 'oracle-worker' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+
+    // Local update
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/update',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { nodeId: 'gcp-master' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+
+    console.log('--- Testing /api/sh ---');
+    // Remote sh
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/sh',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { nodeId: 'oracle-worker', command: 'uptime' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+    assert.ok(res.data.output.includes('Worker output for: uptime'));
+
+    // Local sh with whitelist alias
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/sh',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { nodeId: 'gcp-master', command: '/pm2-list' });
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.data.ok, true);
+    assert.ok(res.data.output.includes('Mock runner success'));
+
+    // Local sh with illegal command (not whitelisted)
+    res = await httpRequest({
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/sh',
+      method: 'POST',
+      headers: { Authorization: `Bearer ${validToken}`, 'Content-Type': 'application/json' },
+    }, { nodeId: 'gcp-master', command: 'rm -rf /' });
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(res.data.ok, false);
+
+    console.log('✅ Task 2 operations tests passed!');
   } finally {
     server.close();
     await fs.unlink(mockConfig.pm2ErrorLogPath).catch(() => {});

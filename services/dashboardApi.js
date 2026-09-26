@@ -4,10 +4,15 @@ const fs = require('fs/promises');
 const path = require('path');
 const axios = require('axios');
 const si = require('systeminformation');
+const { promisify } = require('util');
+const { exec, execFile } = require('child_process');
+const execAsync = promisify(exec);
 const deployer = require('../lib/deployer');
 const repoInspector = require('../lib/repoInspector');
 const nodeManager = require('../lib/nodeManager');
 const nodeClient = require('../lib/nodeClient');
+const whitelist = require('../lib/whitelist');
+const runner = require('../lib/runner');
 const { formatFileSize, readLastLines } = require('../config/utils');
 
 let serverInstance = null;
@@ -152,6 +157,9 @@ function createDashboardServer(config, deps = {}) {
   const depNodeManager = deps.nodeManager || nodeManager;
   const depNodeClient = deps.nodeClient || nodeClient;
   const depSi = deps.si || si;
+  const depWhitelist = deps.whitelist || whitelist;
+  const depRunner = deps.runner || runner;
+  const depExecAsync = deps.execAsync || execAsync;
 
   const server = http.createServer(async (req, res) => {
     setCorsHeaders(req, res, config);
@@ -624,6 +632,225 @@ function createDashboardServer(config, deps = {}) {
           ok: true,
           node: { id: selectedNode.id, name: selectedNode.name || selectedNode.id },
           logs: logsText,
+        });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    // 12. Clean Cache (/cleancache)
+    if (pathname === '/api/cleancache' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        const targetNodeId = body.nodeId || 'gcp-master';
+
+        if (targetNodeId === 'all') {
+          const allNodes = await depNodeManager.getNodes(config);
+          const results = [];
+          for (const node of allNodes) {
+            if (node.isLocal) {
+              if (process.platform === 'linux') {
+                await depExecAsync('sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches').catch(() => {});
+              }
+              await depExecAsync('pm2 flush').catch(() => {});
+              results.push({ node: node.name || node.id, ok: true, result: 'Flushed & dropped caches' });
+            } else {
+              const remoteRes = await depNodeClient.cleanCache(node, httpClient);
+              results.push({ node: node.name || node.id, ok: remoteRes.ok, result: remoteRes.result || remoteRes.error });
+            }
+          }
+          sendJson(res, 200, { ok: true, results });
+          return;
+        }
+
+        const selectedNode = await depNodeManager.getNode(targetNodeId, config);
+        if (!selectedNode) {
+          sendJson(res, 404, { ok: false, error: 'Không tìm thấy node' });
+          return;
+        }
+
+        if (selectedNode.isLocal) {
+          if (process.platform === 'linux') {
+            await depExecAsync('sudo sync && echo 3 | sudo tee /proc/sys/vm/drop_caches').catch(() => {});
+          }
+          await depExecAsync('pm2 flush').catch(() => {});
+          sendJson(res, 200, {
+            ok: true,
+            node: { id: selectedNode.id, name: selectedNode.name || selectedNode.id },
+            result: { pm2Flush: 'flushed', cacheFreed: 'Đã giải phóng cache RAM và flush log PM2' },
+          });
+          return;
+        }
+
+        const remoteRes = await depNodeClient.cleanCache(selectedNode, httpClient);
+        sendJson(res, remoteRes.ok ? 200 : 502, {
+          ok: remoteRes.ok,
+          node: { id: selectedNode.id, name: selectedNode.name || selectedNode.id },
+          result: remoteRes.result || { error: remoteRes.error },
+        });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    // 13. Restart PM2 (/restart)
+    if (pathname === '/api/restart' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        const targetNodeId = body.nodeId || 'gcp-master';
+        const selectedNode = await depNodeManager.getNode(targetNodeId, config);
+        if (!selectedNode) {
+          sendJson(res, 404, { ok: false, error: 'Không tìm thấy node' });
+          return;
+        }
+
+        if (selectedNode.isLocal) {
+          const processName = process.env.PM2_PROCESS_NAME || config?.pm2ProcessName || 'assistant-bot';
+          setTimeout(() => {
+            execFile('pm2', ['restart', processName, '--update-env', '--max-memory-restart', '200M'], () => {});
+          }, 1200);
+          sendJson(res, 200, {
+            ok: true,
+            message: `Tiến trình PM2 "${processName}" trên ${selectedNode.name || 'Master'} sẽ khởi động lại trong 1-2 giây.`,
+          });
+          return;
+        }
+
+        const remoteRes = await depNodeClient.restartAgent(selectedNode, httpClient);
+        sendJson(res, remoteRes.ok ? 200 : 502, {
+          ok: remoteRes.ok,
+          message: remoteRes.message || (remoteRes.ok ? 'Worker Agent đang khởi động lại' : remoteRes.error),
+        });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    // 14. Update Source Code & Restart (/update)
+    if (pathname === '/api/update' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        const targetNodeId = body.nodeId || 'gcp-master';
+
+        if (targetNodeId === 'all') {
+          const allNodes = await depNodeManager.getNodes(config);
+          const results = [];
+          for (const node of allNodes) {
+            if (node.isLocal) {
+              const commands = [{ cmd: 'git', args: ['pull', 'origin', 'main'] }, { cmd: 'npm', args: ['install', '--omit=dev'] }];
+              const runResults = await depRunner.runSequence(commands, { timeoutMs: 90000 });
+              results.push({ node: node.name || node.id, ok: true, output: runResults });
+            } else {
+              const remoteRes = await depNodeClient.update(node, httpClient);
+              results.push({ node: node.name || node.id, ok: remoteRes.ok, output: remoteRes.output || remoteRes.error });
+            }
+          }
+          sendJson(res, 200, { ok: true, results });
+          return;
+        }
+
+        const selectedNode = await depNodeManager.getNode(targetNodeId, config);
+        if (!selectedNode) {
+          sendJson(res, 404, { ok: false, error: 'Không tìm thấy node' });
+          return;
+        }
+
+        if (selectedNode.isLocal) {
+          let commands = [{ cmd: 'git', args: ['pull', 'origin', 'main'] }, { cmd: 'npm', args: ['install', '--omit=dev'] }];
+          try {
+            commands = depWhitelist.getCommands('update', []);
+          } catch {}
+          const results = await depRunner.runSequence(commands, { timeoutMs: 90000 });
+          const success = results.every((r) => r.ok);
+          if (success) {
+            const processName = process.env.PM2_PROCESS_NAME || config?.pm2ProcessName || 'assistant-bot';
+            setTimeout(() => {
+              execFile('pm2', ['restart', processName, '--update-env', '--max-memory-restart', '200M'], () => {});
+            }, 1500);
+          }
+          sendJson(res, 200, {
+            ok: success,
+            output: results.map((r, i) => `${commands[i].cmd} ${(commands[i].args || []).join(' ')}: ${r.ok ? 'OK' : 'FAILED'}\n${r.stdout || ''}${r.stderr || ''}`).join('\n\n'),
+          });
+          return;
+        }
+
+        const remoteRes = await depNodeClient.update(selectedNode, httpClient);
+        sendJson(res, remoteRes.ok ? 200 : 502, {
+          ok: remoteRes.ok,
+          output: remoteRes.output || remoteRes.error || 'Cập nhật hoàn tất',
+        });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    // 15. Safe Whitelisted Shell Terminal (/sh)
+    if (pathname === '/api/sh/aliases' && req.method === 'GET') {
+      const aliases = depWhitelist.listAliases ? depWhitelist.listAliases() : [];
+      sendJson(res, 200, { ok: true, aliases });
+      return;
+    }
+
+    if (pathname === '/api/sh' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req);
+        const rawCmd = (body.command || '').trim();
+        const targetNodeId = body.nodeId || 'gcp-master';
+
+        if (!rawCmd) {
+          sendJson(res, 400, { ok: false, error: 'Thiếu câu lệnh (command)' });
+          return;
+        }
+
+        const selectedNode = await depNodeManager.getNode(targetNodeId, config);
+        if (!selectedNode) {
+          sendJson(res, 404, { ok: false, error: 'Không tìm thấy node' });
+          return;
+        }
+
+        if (!selectedNode.isLocal) {
+          const remoteRes = await depNodeClient.execCommand(selectedNode, rawCmd, httpClient);
+          const out = remoteRes.ok ? [remoteRes.stdout, remoteRes.stderr].filter(Boolean).join('\n') : (remoteRes.error || remoteRes.stderr || 'Lệnh thất bại');
+          sendJson(res, remoteRes.ok ? 200 : 502, {
+            ok: remoteRes.ok,
+            node: { id: selectedNode.id, name: selectedNode.name || selectedNode.id },
+            output: out,
+          });
+          return;
+        }
+
+        const parts = rawCmd.split(/\s+/);
+        const alias = parts[0].replace(/^\//, '');
+        const args = parts.slice(1);
+
+        let commands;
+        try {
+          commands = depWhitelist.getCommands(alias, args);
+        } catch (err) {
+          sendJson(res, 400, { ok: false, error: err.message });
+          return;
+        }
+
+        const results = await depRunner.runSequence(commands, { timeoutMs: 60000 });
+        const outputLines = [];
+        for (let i = 0; i < commands.length; i++) {
+          const step = commands[i];
+          const r = results[i] || {};
+          outputLines.push(`$ ${step.cmd} ${(step.args || []).join(' ')}`.trim());
+          if (r.stdout) outputLines.push(r.stdout.trimEnd());
+          if (r.stderr) outputLines.push(`stderr: ${r.stderr.trimEnd()}`);
+          if (typeof r.code !== 'undefined') outputLines.push(`[exit code: ${r.code}]`);
+        }
+
+        sendJson(res, 200, {
+          ok: results.every((r) => r.ok),
+          node: { id: selectedNode.id, name: selectedNode.name || selectedNode.id },
+          output: outputLines.join('\n\n'),
         });
       } catch (err) {
         sendJson(res, 500, { ok: false, error: err.message });
