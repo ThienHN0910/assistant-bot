@@ -301,7 +301,7 @@ NODE_ENV="production"
    ```
 2. **Pull updates and verify**:
    ```bash
-   cd ~/assistant-bot
+   cd ~/app/telegram-bot
    git checkout main
    git pull origin main
    npm run check:syntax
@@ -319,7 +319,7 @@ NODE_ENV="production"
 2. **Via Direct SSH (Fallback)**:
    ```bash
    ssh -i /path/to/oracle_key ubuntu@168.***.***.235
-   cd ~/assistant-bot
+   cd ~/app/telegram-bot
    git checkout main
    git pull origin main
    pm2 restart assistant-node-agent
