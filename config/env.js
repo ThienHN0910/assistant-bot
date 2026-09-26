@@ -57,6 +57,10 @@ function getConfig() {
   // IP Public của VPS (Tùy chọn, nếu không điền bot sẽ tự động nhận diện)
   const vpsPublicIp = (process.env.VPS_PUBLIC_IP || '').trim();
 
+  // Cấu hình Multi-VPS Nodes Topology
+  const nodesConfigPath = toAbsolutePath(process.env.NODES_CONFIG_PATH || './data/nodes.json');
+  const nodesConfig = (process.env.NODES_CONFIG || '').trim();
+
   // Bật/tắt service cảnh báo tài nguyên tự động (Watchdog)
   const enableWatchdog = process.env.ENABLE_WATCHDOG !== 'false';
 
@@ -82,6 +86,8 @@ function getConfig() {
     sessionSecret,
     dashboardAllowedOrigin,
     dashboardPort,
+    nodesConfigPath,
+    nodesConfig,
     enableWatchdog,
   };
 }
