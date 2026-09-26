@@ -8,6 +8,7 @@ const logsCommand = require("./commands/logs");
 const uptimeCommand = require("./commands/uptime");
 const psCommand = require("./commands/ps");
 const notesCommand = require("./commands/notes");
+const nodesCommand = require("./commands/nodes");
 const cleanCacheCommand = require("./commands/cleancache");
 const restartCommand = require("./commands/restart");
 const shCommand = require("./commands/sh");
@@ -35,6 +36,7 @@ async function startBot() {
     const modules = [
       startCommand,
       statusCommand,
+      nodesCommand,
       ipCommand,
       logsCommand,
       uptimeCommand,

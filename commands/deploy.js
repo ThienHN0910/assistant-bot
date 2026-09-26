@@ -3,9 +3,10 @@ const path = require('path');
 const deployer = require('../lib/deployer');
 const sandbox = require('../lib/sandbox');
 const deployStore = require('../lib/deployStore');
+const nodeManager = require('../lib/nodeManager');
 const { escapeHtml } = require('../config/utils');
 
-async function handleZipDeploy(ctx, zipName, target = 'vps', config) {
+async function handleZipDeploy(ctx, zipName, target = 'vps', config, options = {}) {
   try {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.zip$/i.test(zipName) || zipName.includes('..')) {
       throw new Error('Tên file ZIP không hợp lệ');
@@ -23,7 +24,7 @@ async function handleZipDeploy(ctx, zipName, target = 'vps', config) {
     await ctx.replyWithHTML(
       `⚙️ <b>Đang tiến hành Deploy dự án "${escapeHtml(projectName)}"...</b>\n` +
       `• File: <code>${escapeHtml(zipName)}</code>\n` +
-      `• Nền tảng: <b>${escapeHtml(target.toUpperCase())}</b>\n` +
+      `• Nền tảng: <b>${escapeHtml(target.toUpperCase())}</b>${options.nodeId ? ` (Node: <code>${escapeHtml(options.nodeId)}</code>)` : ''}\n` +
       `<i>Vui lòng đợi vài giây trong khi thiết lập...</i>`
     );
 
@@ -33,6 +34,7 @@ async function handleZipDeploy(ctx, zipName, target = 'vps', config) {
         sourcePath: zipPath,
         projectName,
         target,
+        nodeId: options.nodeId,
       },
       config
     );
@@ -42,7 +44,7 @@ async function handleZipDeploy(ctx, zipName, target = 'vps', config) {
     await ctx.replyWithHTML(
       `🎉 <b>DEPLOY THÀNH CÔNG!</b>\n\n` +
       `• Dự án: <b>${escapeHtml(dep.name)}</b>\n` +
-      `• Nền tảng: <code>${dep.target.toUpperCase()}</code>\n` +
+      `• Nền tảng: <code>${dep.target.toUpperCase()}</code>${dep.nodeId ? ` (Node: <code>${escapeHtml(dep.nodeId)}</code>)` : ''}\n` +
       `• Loại hình: <code>${dep.type === 'backend' ? 'Node.js Backend' : 'Web Tĩnh / SPA'}</code>\n` +
       `• Tên miền: <code>${escapeHtml(dep.domain || '')}</code>\n` +
       `• URL truy cập: <a href="${escapeHtml(dep.url)}">${escapeHtml(dep.url)}</a>\n\n` +
@@ -170,7 +172,8 @@ module.exports = {
       if (args.length > 0) {
         const zipArg = args[0].endsWith('.zip') ? args[0] : `${args[0]}.zip`;
         const targetArg = (args[1] || 'vps').toLowerCase();
-        await handleZipDeploy(ctx, zipArg, targetArg, config);
+        const nodeIdArg = args[2] || undefined;
+        await handleZipDeploy(ctx, zipArg, targetArg, config, { nodeId: nodeIdArg });
         return;
       }
 
@@ -208,17 +211,31 @@ module.exports = {
   },
 
   register: (bot, config) => {
-    // 1. Khi chọn file ZIP: hỏi nền tảng nếu có nhiều hơn 1 lựa chọn
+    // 1. Khi chọn file ZIP: hỏi nền tảng nếu có nhiều hơn 1 lựa chọn hoặc nhiều VPS node
     bot.action(/^deploy_zip:(.+)$/, async (ctx) => {
       try {
         await ctx.answerCbQuery();
         const zipName = ctx.match[1];
+        const depNodeManager = config?.nodeManager || nodeManager;
+        const nodes = await depNodeManager.getNodes(config);
         const validTargets = deployer.getValidTargetsForSource('zip_upload', config);
 
-        if (validTargets.length > 1) {
+        if (validTargets.length > 1 || (validTargets.includes('vps') && nodes.length > 1)) {
           const buttons = [];
           if (validTargets.includes('vps')) {
-            buttons.push([{ text: '🖥️ Triển khai lên VPS (Nginx)', callback_data: `zip_target:vps:${zipName}` }]);
+            if (nodes.length > 1) {
+              for (const node of nodes) {
+                buttons.push([{
+                  text: `🖥️ VPS: ${node.name || node.id}`,
+                  callback_data: `zip_target:vps:${node.id}:${zipName}`,
+                }]);
+              }
+            } else {
+              buttons.push([{
+                text: '🖥️ Triển khai lên VPS (Nginx)',
+                callback_data: `zip_target:vps:${nodes[0]?.id || 'gcp-master'}:${zipName}`,
+              }]);
+            }
           }
           if (validTargets.includes('vercel')) {
             buttons.push([{ text: '▲ Triển khai lên Vercel', callback_data: `zip_target:vercel:${zipName}` }]);
@@ -236,8 +253,8 @@ module.exports = {
           return;
         }
 
-        // Nếu chỉ có VPS
-        await handleZipDeploy(ctx, zipName, 'vps', config);
+        // Nếu chỉ có VPS và 1 node duy nhất
+        await handleZipDeploy(ctx, zipName, 'vps', config, { nodeId: nodes[0]?.id });
       } catch (err) {
         console.error('[DEPLOY_ZIP_ACTION_ERROR]', err);
         await ctx.reply('⚠️ Lỗi khi chọn file deploy.');
@@ -245,12 +262,29 @@ module.exports = {
     });
 
     // 2. Khi xác nhận nền tảng cho file ZIP
-    bot.action(/^zip_target:([a-zA-Z0-9_-]+):(.+)$/, async (ctx) => {
+    bot.action(/^zip_target:(.+)$/, async (ctx) => {
       try {
         await ctx.answerCbQuery('Bắt đầu triển khai...');
-        const target = ctx.match[1];
-        const zipName = ctx.match[2];
-        await handleZipDeploy(ctx, zipName, target, config);
+        const payload = ctx.match[1];
+        const parts = payload.split(':');
+        let target = 'vps';
+        let nodeId = undefined;
+        let zipName = '';
+
+        if (parts[0] === 'vps') {
+          target = 'vps';
+          if (parts.length >= 3) {
+            nodeId = parts[1];
+            zipName = parts.slice(2).join(':');
+          } else {
+            zipName = parts[1];
+          }
+        } else {
+          target = parts[0];
+          zipName = parts.slice(1).join(':');
+        }
+
+        await handleZipDeploy(ctx, zipName, target, config, { nodeId });
       } catch (err) {
         console.error('[ZIP_TARGET_ACTION_ERROR]', err);
         await ctx.reply('⚠️ Lỗi khi kích hoạt deploy file zip.');
