@@ -450,6 +450,53 @@ async function runTests() {
       }),
       /ZIP extraction failed/
     );
+
+    // Test resolveNginxPaths & resolveUploadDir
+    const defaultPaths = agentSandbox.resolveNginxPaths('app');
+    assert.strictEqual(defaultPaths.availablePath, path.join('/etc/nginx/sites-available', 'web-app'));
+    assert.strictEqual(defaultPaths.enabledPath, path.join('/etc/nginx/sites-enabled', 'web-app'));
+
+    const legacyPaths = agentSandbox.resolveNginxPaths('app', { nginxConfDir: '/custom/conf' });
+    assert.strictEqual(legacyPaths.availablePath, path.join('/custom/conf', 'app.conf'));
+    assert.strictEqual(legacyPaths.enabledPath, null);
+
+    const customDirs = agentSandbox.resolveNginxPaths('app', {
+      nginxAvailableDir: '/opt/nginx/sites-available',
+      nginxEnabledDir: '/opt/nginx/sites-enabled',
+    });
+    assert.strictEqual(customDirs.availablePath, path.join('/opt/nginx/sites-available', 'web-app'));
+    assert.strictEqual(customDirs.enabledPath, path.join('/opt/nginx/sites-enabled', 'web-app'));
+
+    const uploadDir = agentSandbox.resolveUploadDir({ uploadDir: '/custom/uploads' });
+    assert.strictEqual(uploadDir, '/custom/uploads');
+
+    // Test sites-available / sites-enabled Linux activation & symlinking
+    const testAvailPath = path.join(temp, 'web-demo');
+    const testEnabledPath = path.join(temp, 'symlink-web-demo');
+    const symlinkCommands = [];
+    await agentSandbox.activateNginxConfig(testAvailPath, 'demo site config', {
+      platform: 'linux',
+      enabledPath: testEnabledPath,
+      runCommand: async (command, args) => {
+        symlinkCommands.push([command, ...args]);
+        if (args[1] === 'install') await fs.copyFile(args[4], args[5]);
+        return { ok: true };
+      },
+    });
+    assert.ok(symlinkCommands.some((c) => c[2] === 'ln' && c[3] === '-sf' && c[4] === testAvailPath && c[5] === testEnabledPath), 'Symlink created in sites-enabled');
+
+    // Test deletion of sites-available and symlink
+    const removeSymlinkCommands = [];
+    await agentSandbox.activateNginxConfig(testAvailPath, null, {
+      platform: 'linux',
+      enabledPath: testEnabledPath,
+      runCommand: async (command, args) => {
+        removeSymlinkCommands.push([command, ...args]);
+        return { ok: true };
+      },
+    });
+    assert.ok(removeSymlinkCommands.some((c) => c[2] === 'rm' && c[4] === testEnabledPath), 'Symlink removed from sites-enabled');
+    assert.ok(removeSymlinkCommands.some((c) => c[2] === 'rm' && c[4] === testAvailPath), 'Config removed from sites-available');
   } finally {
     await fs.rm(temp, { recursive: true, force: true });
   }
