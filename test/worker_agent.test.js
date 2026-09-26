@@ -1,6 +1,10 @@
 const assert = require('assert');
 const http = require('http');
 const { EventEmitter } = require('events');
+const fs = require('fs/promises');
+const os = require('os');
+const path = require('path');
+const agentSandbox = require('../agent/agentSandbox');
 const {
   createAgentServer,
   checkAgentAuth,
@@ -47,6 +51,10 @@ async function runTests() {
     removeProject: async (projectName) => ({ ok: true, projectName }),
     runSelfUpdate: async () => ({ ok: true, output: 'Already up to date.' }),
     restartSelf: () => { restartCalled = true; },
+    getProcessList: async () => ({ ok: true, processes: [{ pid: 7, name: 'node' }] }),
+    getAgentLogs: async (lines) => ({ ok: true, log: `last ${lines} lines` }),
+    cleanCacheAndLogs: async () => ({ ok: true, cacheFreed: '20 MB', pm2Flush: 'OK' }),
+    runCmd: async (cmd, args) => ({ ok: true, stdout: `${cmd} ${args.join(' ')}`, stderr: '' }),
   };
 
   const server = createAgentServer({
@@ -196,6 +204,27 @@ async function runTests() {
     }, oversizedZip);
     assert.strictEqual(zipOverflow.status, 413);
 
+    for (const endpoint of ['/api/processes', '/api/logs?lines=5', '/api/cleancache', '/api/restart', '/api/exec']) {
+      const method = endpoint.includes('processes') || endpoint.includes('logs') ? 'GET' : 'POST';
+      const unauthorized = await makeRequest(server, { path: endpoint, method });
+      assert.strictEqual(unauthorized.status, 401, `${endpoint} requires authentication`);
+    }
+    const headers = { 'X-Agent-Secret': secret };
+    const processes = await makeRequest(server, { path: '/api/processes', method: 'GET', headers });
+    assert.strictEqual(processes.status, 200);
+    assert.strictEqual(processes.data.processes[0].pid, 7);
+    const logs = await makeRequest(server, { path: '/api/logs?lines=5', method: 'GET', headers });
+    assert.strictEqual(logs.data.log, 'last 5 lines');
+    const clean = await makeRequest(server, { path: '/api/cleancache', method: 'POST', headers });
+    assert.strictEqual(clean.data.result.pm2Flush, 'OK');
+    const restart = await makeRequest(server, { path: '/api/restart', method: 'POST', headers });
+    assert.strictEqual(restart.status, 200);
+    const allowed = await makeRequest(server, { path: '/api/exec', method: 'POST', headers }, JSON.stringify({ command: 'hostname' }));
+    assert.strictEqual(allowed.status, 200);
+    assert.strictEqual(allowed.data.stdout, 'hostname ');
+    const blocked = await makeRequest(server, { path: '/api/exec', method: 'POST', headers }, JSON.stringify({ command: 'rm -rf /' }));
+    assert.strictEqual(blocked.status, 403);
+
     console.log('✅ worker agent server standard & size tests passed');
   } finally {
     server.close();
@@ -248,6 +277,51 @@ async function runTests() {
   const bufPromise = parseBufferBody(fakeBufReq);
   fakeBufReq.emit('error', new Error('ECONNRESET in buf stream'));
   await assert.rejects(bufPromise, /ECONNRESET in buf stream/);
+
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-sandbox-test-'));
+  try {
+    const oldDeployDir = process.env.WEB_DEPLOY_DIR;
+    delete process.env.WEB_DEPLOY_DIR;
+    try {
+      assert.throws(() => agentSandbox.resolveWebDeployDir({}), /WEB_DEPLOY_DIR/);
+      assert.strictEqual(agentSandbox.resolveWebDeployDir({ webDeployDir: temp }), temp);
+    } finally {
+      if (oldDeployDir === undefined) delete process.env.WEB_DEPLOY_DIR;
+      else process.env.WEB_DEPLOY_DIR = oldDeployDir;
+    }
+    const oldLogPath = process.env.PM2_ERROR_LOG_PATH;
+    delete process.env.PM2_ERROR_LOG_PATH;
+    try {
+      assert.deepStrictEqual(await agentSandbox.getAgentLogs(5), { ok: true, log: '(PM2_ERROR_LOG_PATH not set)' });
+    } finally {
+      if (oldLogPath === undefined) delete process.env.PM2_ERROR_LOG_PATH;
+      else process.env.PM2_ERROR_LOG_PATH = oldLogPath;
+    }
+    const confPath = path.join(temp, 'site.conf');
+    await fs.writeFile(confPath, 'working config');
+    await assert.rejects(
+      agentSandbox.activateNginxConfig(confPath, 'broken config', {
+        platform: 'linux',
+        runCommand: async (command) => ({ ok: command !== 'nginx' || (await fs.readFile(confPath, 'utf8')) === 'working config', stderr: 'bad config' }),
+      }),
+      /nginx -t failed/
+    );
+    assert.strictEqual(await fs.readFile(confPath, 'utf8'), 'working config', 'failed activation restores prior config');
+    await assert.rejects(
+      agentSandbox.deployZipPayload(Buffer.from('x'), 'safe-name', 'bad;server_name injected', { webDeployDir: temp }),
+      /Invalid subdomain/
+    );
+    await assert.rejects(agentSandbox.removeProject('!!!', { webDeployDir: temp }), /Invalid project name/);
+    await assert.rejects(
+      agentSandbox.deployZipPayload(Buffer.from('invalid archive'), 'bad-site', 'bad-site', {
+        webDeployDir: temp,
+        nginxConfDir: path.join(temp, 'nginx'),
+      }),
+      /ZIP extraction failed/
+    );
+  } finally {
+    await fs.rm(temp, { recursive: true, force: true });
+  }
 
   console.log('✅ worker agent hardening tests passed');
 }

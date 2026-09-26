@@ -88,7 +88,7 @@ Tham khảo mẫu hoàn chỉnh tại [`.env.example`](.env.example):
 | `RENDER_API_KEY` | API Key của Render (deploy Render) | Không | `rnd_*` |
 | `RENDER_OWNER_ID` | Owner / Team ID của Render | Không | `usr_*` |
 | `PM2_PROCESS_NAME` | Tên tiến trình PM2 của bot | Không | `assistant-bot` |
-| `WEB_DEPLOY_DIR` | Thư mục lưu mã nguồn web deploy trên VPS | Không | `/home/hnt/web` |
+| `WEB_DEPLOY_DIR` | Thư mục lưu mã nguồn web deploy trên VPS | Không | `/var/www` |
 | `UPLOAD_DIR` | Thư mục nhận file zip upload | Không | `/home/hnt/uploads` |
 | `PAGESPEED_API_KEY` | Google PageSpeed Insights API Key cho lệnh `/perf` | Không | *(Google API Key)* |
 
@@ -118,6 +118,22 @@ nano .env # Điền các biến môi trường cần thiết
 pm2 start bot.js --name assistant-bot --max-memory-restart 200M
 pm2 save
 ```
+
+### Oracle Worker: chuẩn bị đường dẫn deploy và cổng web
+
+Trên Oracle Worker, đặt `WEB_DEPLOY_DIR=/var/www` trong `.env` của agent, cài `unzip` và bảo đảm tài khoản chạy agent có quyền tạo thư mục trong `/var/www` và ghi cấu hình Nginx. Agent báo lỗi nếu giải nén, cấp quyền đọc hoặc cấu hình Nginx thất bại. Trang web được giải nén với quyền đọc cho Nginx; kiểm tra quyền của các thư mục cha bằng `namei -l /var/www/<project>/index.html`.
+
+Trong OCI Console, mở **Networking → Virtual Cloud Networks → VCN → Security Lists** (hoặc Network Security Group gắn với instance), thêm ingress TCP 80 và 443 từ nguồn cần phục vụ. Oracle lưu ý phải kiểm tra cả quy tắc mạng OCI và firewall trong hệ điều hành: [OCI security rules](https://docs.oracle.com/en-us/iaas/Content/Security/Reference/configuration_tasks.htm).
+
+Trên máy Ubuntu dùng UFW, kiểm tra `sudo ufw status` rồi cho phép HTTP/HTTPS nếu UFW đang bật: `sudo ufw allow 80/tcp` và `sudo ufw allow 443/tcp`. Nếu máy dùng iptables, kiểm tra `sudo iptables -L INPUT -n --line-numbers`, rồi thêm quy tắc phù hợp với chính sách hiện có:
+
+```bash
+sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+sudo netfilter-persistent save # nếu đã cài netfilter-persistent
+```
+
+Cuối cùng chạy `sudo nginx -t`, kiểm tra `systemctl status nginx`, và thử truy cập domain từ bên ngoài. Nếu `.env` của Worker đang chứa `WEB_DEPLOY_DIR` cũ, cập nhật giá trị đó trước khi restart agent.
 
 ### 3. Cấu hình Nginx Reverse Proxy cho Dashboard
 Tạo file `/etc/nginx/sites-available/web-dashboard.conf`:

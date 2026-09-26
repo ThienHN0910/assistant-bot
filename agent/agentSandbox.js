@@ -51,16 +51,57 @@ server {
 `.trim();
 }
 
+async function activateNginxConfig(confPath, contents, options = {}) {
+  const platform = options.platform || process.platform;
+  const command = options.runCommand || runCmd;
+  let previous = null;
+  try {
+    previous = await fs.readFile(confPath, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+
+  await fs.mkdir(path.dirname(confPath), { recursive: true });
+  await fs.writeFile(confPath, contents, 'utf8');
+  try {
+    if (platform === 'linux') {
+      const tested = await command('nginx', ['-t']);
+      if (!tested.ok) throw new Error(`nginx -t failed: ${tested.stderr}`);
+      const reloaded = await command('systemctl', ['reload', 'nginx']);
+      if (!reloaded.ok) throw new Error(`nginx reload failed: ${reloaded.stderr}`);
+    }
+  } catch (err) {
+    if (previous === null) await fs.rm(confPath, { force: true });
+    else await fs.writeFile(confPath, previous, 'utf8');
+    if (platform === 'linux') {
+      const restored = await command('nginx', ['-t']);
+      if (restored.ok) await command('systemctl', ['reload', 'nginx']);
+    }
+    throw err;
+  }
+}
+
+function resolveWebDeployDir(options = {}) {
+  const directory = options.webDeployDir || process.env.WEB_DEPLOY_DIR;
+  if (!directory) throw new Error('WEB_DEPLOY_DIR must be configured in worker .env');
+  return directory;
+}
+
 async function deployZipPayload(zipBuffer, projectName, subdomain, options = {}) {
+  if (typeof projectName !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(projectName)) {
+    throw new Error('Invalid project name');
+  }
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
   const effectiveSub = (subdomain || sanitizedName).toLowerCase();
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(effectiveSub)) {
+    throw new Error('Invalid subdomain');
+  }
   const baseDomain = process.env.BASE_DOMAIN || options.baseDomain || 'thienhn.io.vn';
   const domain = `${effectiveSub}.${baseDomain}`;
-  const webDeployDir = options.webDeployDir || process.env.WEB_DEPLOY_DIR || path.join(process.env.HOME || '/home/hnt', 'web');
+  const webDeployDir = resolveWebDeployDir(options);
   const targetDir = path.join(webDeployDir, sanitizedName);
 
-  await fs.mkdir(webDeployDir, { recursive: true }).catch(() => {});
-  await fs.mkdir(targetDir, { recursive: true }).catch(() => {});
+  await fs.mkdir(targetDir, { recursive: true });
 
   // Save temporary zip and extract
   const tempZip = path.join(os.tmpdir(), `agent-deploy-${Date.now()}-${sanitizedName}.zip`);
@@ -71,9 +112,14 @@ async function deployZipPayload(zipBuffer, projectName, subdomain, options = {})
       ? await runCmd('tar', ['-xf', tempZip, '-C', targetDir])
       : await runCmd('unzip', ['-o', tempZip, '-d', targetDir]);
 
+    let extractResult = unzipCmd;
     if (!unzipCmd.ok && process.platform !== 'win32') {
       // Fallback to tar if unzip isn't installed
-      await runCmd('tar', ['-xf', tempZip, '-C', targetDir]);
+      extractResult = await runCmd('tar', ['-xf', tempZip, '-C', targetDir]);
+    }
+    if (!extractResult.ok) {
+      await fs.rm(targetDir, { recursive: true, force: true });
+      throw new Error('ZIP extraction failed: archive is invalid or extractor is unavailable');
     }
 
     // Flatten nested single subdirectory if needed
@@ -94,6 +140,16 @@ async function deployZipPayload(zipBuffer, projectName, subdomain, options = {})
     await fs.rm(tempZip, { force: true }).catch(() => {});
   }
 
+  const extractedFiles = await fs.readdir(targetDir);
+  if (extractedFiles.length === 0) {
+    await fs.rm(targetDir, { recursive: true, force: true });
+    throw new Error('ZIP extraction failed: no files extracted');
+  }
+  if (process.platform === 'linux') {
+    const permissions = await runCmd('chmod', ['-R', '755', targetDir]);
+    if (!permissions.ok) throw new Error(`Cannot make deployed files readable: ${permissions.stderr}`);
+  }
+
   // Generate Nginx configuration
   const sslCert = process.env.SSL_CERT_PATH || options.sslCert || '/etc/ssl/certs/cloudflare_cert.pem';
   const sslKey = process.env.SSL_KEY_PATH || options.sslKey || '/etc/ssl/private/cloudflare_key.key';
@@ -108,19 +164,9 @@ async function deployZipPayload(zipBuffer, projectName, subdomain, options = {})
   const confPath = path.join(confDir, `${sanitizedName}.conf`);
 
   try {
-    await fs.mkdir(confDir, { recursive: true });
-    await fs.writeFile(confPath, vhostConfig, 'utf8');
-
-    // Test and reload Nginx if on Linux
-    if (process.platform === 'linux') {
-      const testRes = await runCmd('nginx', ['-t']);
-      if (testRes.ok) {
-        await runCmd('systemctl', ['reload', 'nginx']);
-      }
-    }
+    await activateNginxConfig(confPath, vhostConfig);
   } catch (err) {
-    // If not running as root or directory not writable, log warning
-    console.warn(`[AGENT_SANDBOX] Nginx conf write skipped/failed: ${err.message}`);
+    throw new Error(`Nginx configuration failed: ${err.message}`);
   }
 
   return {
@@ -134,8 +180,11 @@ async function deployZipPayload(zipBuffer, projectName, subdomain, options = {})
 }
 
 async function removeProject(projectName, options = {}) {
+  if (typeof projectName !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(projectName)) {
+    throw new Error('Invalid project name');
+  }
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
-  const webDeployDir = options.webDeployDir || process.env.WEB_DEPLOY_DIR || path.join(process.env.HOME || '/home/hnt', 'web');
+  const webDeployDir = resolveWebDeployDir(options);
   const targetDir = path.join(webDeployDir, sanitizedName);
 
   await fs.rm(targetDir, { recursive: true, force: true }).catch(() => {});
@@ -172,11 +221,59 @@ function restartSelf() {
   execFile('pm2', ['restart', 'assistant-node-agent'], () => {});
 }
 
+async function getProcessList() {
+  const result = await runCmd('ps', ['aux', '--sort=-%mem'], { timeout: 10000, maxBuffer: 64 * 1024 });
+  if (!result.ok) return { ok: false, error: result.stderr };
+  const processes = result.stdout.split('\n').slice(1, 6).map((line) => {
+    const parts = line.trim().split(/\s+/);
+    return { user: parts[0] || '', pid: Number(parts[1]) || 0,
+      cpu: Number(parts[2]) || 0, mem: Number(parts[3]) || 0,
+      name: parts.slice(10).join(' ').slice(0, 80) };
+  });
+  return { ok: true, processes };
+}
+
+async function getAgentLogs(lines = 20) {
+  const logPath = process.env.PM2_ERROR_LOG_PATH;
+  if (!logPath) return { ok: true, log: '(PM2_ERROR_LOG_PATH not set)' };
+  let handle;
+  try {
+    handle = await fs.open(logPath, 'r');
+    const stat = await handle.stat();
+    const size = Math.min(stat.size, 64 * 1024);
+    const buffer = Buffer.alloc(size);
+    await handle.read(buffer, 0, size, stat.size - size);
+    return { ok: true, log: buffer.toString('utf8').split('\n').slice(-Math.max(1, Math.min(lines, 100))).join('\n') };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  } finally {
+    await handle?.close();
+  }
+}
+
+async function cleanCacheAndLogs() {
+  const pm2 = await runCmd('pm2', ['flush'], { timeout: 30000, maxBuffer: 64 * 1024 });
+  let cacheFreed = 'N/A';
+  if (process.platform === 'linux') {
+    await runCmd('sync', [], { timeout: 10000 });
+    const drop = await runCmd('sh', ['-c', 'echo 3 | sudo -n tee /proc/sys/vm/drop_caches'], {
+      timeout: 10000, maxBuffer: 64 * 1024,
+    });
+    cacheFreed = drop.ok ? 'cache cleared' : 'cache clear unavailable';
+  }
+  return { ok: pm2.ok, cacheFreed, pm2Flush: pm2.ok ? 'OK' : pm2.stderr };
+}
+
 module.exports = {
   runCmd,
   generateNginxVhost,
+  activateNginxConfig,
+  resolveWebDeployDir,
   deployZipPayload,
   removeProject,
   runSelfUpdate,
   restartSelf,
+  getProcessList,
+  getAgentLogs,
+  cleanCacheAndLogs,
 };

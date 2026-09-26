@@ -16,6 +16,14 @@ try {
 
 const DEFAULT_MAX_JSON_BYTES = 1024 * 1024; // 1MB
 const DEFAULT_MAX_ZIP_BYTES = 50 * 1024 * 1024; // 50MB
+const EXEC_COMMANDS = new Map([
+  ['df -h', ['df', ['-h']]], ['free -m', ['free', ['-m']]],
+  ['uptime', ['uptime', []]], ['whoami', ['whoami', []]],
+  ['hostname', ['hostname', []]], ['git status', ['git', ['status']]],
+  ['git log --oneline -5', ['git', ['log', '--oneline', '-5']]],
+  ['pm2 list', ['pm2', ['list']]], ['pm2 status', ['pm2', ['status']]],
+  ['nginx -t', ['nginx', ['-t']]], ['cat /proc/meminfo', ['cat', ['/proc/meminfo']]],
+]);
 
 function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -194,6 +202,52 @@ function createAgentServer(options = {}) {
         }
       } catch (err) {
         sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    if (pathname === '/api/processes' && req.method === 'GET') {
+      try {
+        const result = await sandbox.getProcessList();
+        sendJson(res, result.ok ? 200 : 500, result);
+      } catch (err) { sendJson(res, 500, { ok: false, error: err.message }); }
+      return;
+    }
+
+    if (pathname === '/api/logs' && req.method === 'GET') {
+      try {
+        const requested = Number.parseInt(urlObj.searchParams.get('lines'), 10);
+        const lines = Number.isFinite(requested) ? Math.max(1, Math.min(requested, 100)) : 20;
+        const result = await sandbox.getAgentLogs(lines);
+        sendJson(res, result.ok ? 200 : 500, result);
+      } catch (err) { sendJson(res, 500, { ok: false, error: err.message }); }
+      return;
+    }
+
+    if (pathname === '/api/cleancache' && req.method === 'POST') {
+      try {
+        const result = await sandbox.cleanCacheAndLogs();
+        sendJson(res, result.ok ? 200 : 500, { ok: result.ok, result });
+      } catch (err) { sendJson(res, 500, { ok: false, error: err.message }); }
+      return;
+    }
+
+    if (pathname === '/api/restart' && req.method === 'POST') {
+      sendJson(res, 200, { ok: true, message: 'Worker agent restarting' });
+      if (options.autoRestart !== false) setTimeout(() => sandbox.restartSelf(), 500);
+      return;
+    }
+
+    if (pathname === '/api/exec' && req.method === 'POST') {
+      try {
+        const body = await parseJsonBody(req, Math.min(maxJsonBytes, 4096));
+        const command = typeof body.command === 'string' ? body.command.trim() : '';
+        const entry = EXEC_COMMANDS.get(command);
+        if (!entry) { sendJson(res, 403, { ok: false, error: 'Command not allowed' }); return; }
+        const result = await sandbox.runCmd(entry[0], entry[1], { timeout: 10000, maxBuffer: 64 * 1024 });
+        sendJson(res, result.ok ? 200 : 500, result);
+      } catch (err) {
+        sendJson(res, err.message.includes('maximum allowed size') ? 413 : 500, { ok: false, error: err.message });
       }
       return;
     }
