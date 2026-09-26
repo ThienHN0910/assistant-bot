@@ -225,14 +225,14 @@ async function removeProject(projectName, options = {}) {
   return { ok: true, projectName: sanitizedName };
 }
 
-async function runSelfUpdate() {
+async function runSelfUpdate(options = {}) {
+  const command = options.execFile || execFileAsync;
   try {
-    const pull = await execFileAsync('git', ['pull', 'origin', 'main'], { timeout: 30000 });
-    let npmOut = '';
-    try {
-      const npmRes = await execFileAsync('npm', ['install', '--omit=dev'], { timeout: 60000 });
-      npmOut = (npmRes.stdout || '').trim();
-    } catch {}
+    const pull = await command('git', ['pull', '--ff-only', 'origin', 'main'], {
+      cwd: path.resolve(__dirname, '..'), timeout: 30000,
+    });
+    const npmRes = await command('npm', ['ci', '--omit=dev'], { cwd: __dirname, timeout: 60000 });
+    const npmOut = (npmRes.stdout || '').trim();
     return { ok: true, output: `${pull.stdout.trim()}${npmOut ? `\n${npmOut}` : ''}` };
   } catch (err) {
     return { ok: false, error: err.message };

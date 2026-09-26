@@ -10,6 +10,7 @@ const {
   checkAgentAuth,
   parseJsonBody,
   parseBufferBody,
+  validateWorkerConfig,
 } = require('../agent/server');
 
 async function makeRequest(server, options, bodyData = null) {
@@ -266,6 +267,24 @@ async function runTests() {
   assert.strictEqual(checkAgentAuth({ headers: {} }, 'my-secret'), false);
   assert.strictEqual(checkAgentAuth({ headers: { 'x-agent-secret': 'wrong' } }, 'my-secret'), false);
   assert.strictEqual(checkAgentAuth({ headers: { 'x-agent-secret': 'my-secret' } }, 'my-secret'), true);
+  assert.throws(() => validateWorkerConfig({ NODE_AGENT_SECRET: '', WEB_DEPLOY_DIR: '/tmp/web' }), /NODE_AGENT_SECRET/);
+  assert.throws(() => validateWorkerConfig({ NODE_AGENT_SECRET: 'dummy-secret', WEB_DEPLOY_DIR: '' }), /WEB_DEPLOY_DIR/);
+
+  const failedUpdateServer = createAgentServer({
+    secret,
+    sandbox: { ...mockSandbox, runSelfUpdate: async () => ({ ok: false, error: 'npm ci failed' }) },
+    autoRestart: false,
+  });
+  await new Promise((resolve) => failedUpdateServer.listen(0, resolve));
+  try {
+    const failedUpdate = await makeRequest(failedUpdateServer, {
+      path: '/api/update', method: 'POST', headers: { 'X-Agent-Secret': secret },
+    });
+    assert.strictEqual(failedUpdate.status, 500);
+    assert.match(failedUpdate.data.update.error, /npm ci failed/);
+  } finally {
+    failedUpdateServer.close();
+  }
 
   // 16. Socket error handling in parseJsonBody and parseBufferBody
   const fakeJsonReq = new EventEmitter();
@@ -280,6 +299,30 @@ async function runTests() {
 
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-sandbox-test-'));
   try {
+    const oldCwd = process.cwd();
+    process.chdir(temp);
+    try {
+      const updateCalls = [];
+      const updateResult = await agentSandbox.runSelfUpdate({
+        execFile: async (cmd, args, opts) => {
+          updateCalls.push({ cmd, args, cwd: opts.cwd });
+          return { stdout: 'updated' };
+        },
+      });
+      assert.strictEqual(updateResult.ok, true);
+      assert.deepStrictEqual(updateCalls.map((call) => call.cmd), ['git', 'npm']);
+      assert.strictEqual(updateCalls[1].cwd, path.resolve(__dirname, '../agent'));
+      const failedInstall = await agentSandbox.runSelfUpdate({
+        execFile: async (cmd) => {
+          if (cmd === 'npm') throw new Error('npm ci failed');
+          return { stdout: 'updated' };
+        },
+      });
+      assert.strictEqual(failedInstall.ok, false);
+      assert.match(failedInstall.error, /npm ci failed/);
+    } finally {
+      process.chdir(oldCwd);
+    }
     const oldDeployDir = process.env.WEB_DEPLOY_DIR;
     delete process.env.WEB_DEPLOY_DIR;
     try {

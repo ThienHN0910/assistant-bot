@@ -4,13 +4,22 @@ const crypto = require('crypto');
 const si = require('systeminformation');
 const agentSandbox = require('./agentSandbox');
 
-// Tự động nạp biến môi trường từ .env (thư mục gốc dự án hoặc thư mục agent)
-try {
-  const dotenv = require('dotenv');
-  dotenv.config({ path: path.resolve(__dirname, '../.env') });
-  dotenv.config({ path: path.resolve(__dirname, '.env') });
-} catch {
-  // Bỏ qua nếu môi trường không có gói dotenv
+// Load worker settings from the agent directory, then let the repository .env take precedence.
+// A missing dotenv dependency must fail startup instead of silently dropping the worker secret and deploy path.
+const dotenv = require('dotenv');
+for (const envPath of [path.resolve(__dirname, '.env'), path.resolve(__dirname, '../.env')]) {
+  const result = dotenv.config({ path: envPath, quiet: true, override: true });
+  if (result.error && result.error.code !== 'ENOENT') {
+    throw new Error(`Cannot load worker environment: ${result.error.message}`);
+  }
+}
+
+function validateWorkerConfig(env = process.env) {
+  for (const key of ['NODE_AGENT_SECRET', 'WEB_DEPLOY_DIR']) {
+    if (typeof env[key] !== 'string' || !env[key].trim()) {
+      throw new Error(`${key} must be configured in worker environment`);
+    }
+  }
 }
 
 
@@ -194,8 +203,8 @@ function createAgentServer(options = {}) {
     if (pathname === '/api/update' && req.method === 'POST') {
       try {
         const result = await sandbox.runSelfUpdate();
-        sendJson(res, 200, { ok: true, update: result });
-        if (options.autoRestart !== false) {
+        sendJson(res, result.ok ? 200 : 500, { ok: result.ok, update: result });
+        if (result.ok && options.autoRestart !== false) {
           setTimeout(() => {
             if (typeof sandbox.restartSelf === 'function') sandbox.restartSelf();
           }, 500);
@@ -259,6 +268,7 @@ function createAgentServer(options = {}) {
 }
 
 if (require.main === module) {
+  validateWorkerConfig();
   const port = process.env.AGENT_PORT || 3001;
   const server = createAgentServer();
   server.listen(port, '0.0.0.0', () => {
@@ -271,4 +281,5 @@ module.exports = {
   checkAgentAuth,
   parseJsonBody,
   parseBufferBody,
+  validateWorkerConfig,
 };
