@@ -121,7 +121,7 @@ pm2 save
 
 ### Oracle Worker: chuẩn bị đường dẫn deploy và cổng web
 
-Worker có bộ phụ thuộc riêng. Sau khi clone hoặc cập nhật repo, chạy `npm ci --prefix agent --omit=dev` từ thư mục gốc rồi `pm2 restart assistant-node-agent --update-env`. `agent/server.js` nạp `.env` ở thư mục gốc repo; nếu thiếu gói `dotenv`, worker sẽ dừng khi khởi động thay vì chạy với cấu hình rỗng.
+Worker có bộ phụ thuộc riêng. Sau khi clone hoặc cập nhật repo, chạy `npm ci --prefix agent --omit=dev` từ thư mục gốc rồi `pm2 restart assistant-node-agent --update-env`. `agent/server.js` ưu tiên `.env` ở thư mục gốc repo hơn biến cũ do PM2 truyền vào; nếu thiếu gói `dotenv`, worker sẽ dừng khi khởi động thay vì chạy với cấu hình rỗng.
 
 Nếu gỡ một deploy thất bại báo `no owned DNS record ID`, kiểm tra `status`, `domain` và `dnsRecordId` của dự án trong registry trên Master, rồi kiểm tra record cùng domain trong Cloudflare DNS. Bot không tự xóa record chưa chứng minh được quyền sở hữu. Với record do bạn tạo thủ công và đã xác nhận không phục vụ site khác, hãy xử lý record đó trong Cloudflare rồi thử gỡ hoặc deploy lại. Không sửa `dnsRecordId` trong registry để vượt qua kiểm tra quyền sở hữu.
 

@@ -4,11 +4,11 @@ const crypto = require('crypto');
 const si = require('systeminformation');
 const agentSandbox = require('./agentSandbox');
 
-// Load worker settings from the repository root or the agent directory.
+// Load worker settings from the agent directory, then let the repository .env take precedence.
 // A missing dotenv dependency must fail startup instead of silently dropping the worker secret and deploy path.
 const dotenv = require('dotenv');
-for (const envPath of [path.resolve(__dirname, '../.env'), path.resolve(__dirname, '.env')]) {
-  const result = dotenv.config({ path: envPath, quiet: true });
+for (const envPath of [path.resolve(__dirname, '.env'), path.resolve(__dirname, '../.env')]) {
+  const result = dotenv.config({ path: envPath, quiet: true, override: true });
   if (result.error && result.error.code !== 'ENOENT') {
     throw new Error(`Cannot load worker environment: ${result.error.message}`);
   }
