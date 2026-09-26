@@ -31,79 +31,79 @@ module.exports = {
       const depSi = deps.si || config.si || si;
 
       const nodes = await depNodeManager.getNodes(config);
-      const nodeBlocks = [];
+      const nodeBlocks = await Promise.all(
+        nodes.map(async (node) => {
+          const maskedIp = depNodeManager.maskIp ? depNodeManager.maskIp(node.ip) : (node.ip ? `${node.ip.split('.')[0]}.***.***` : '');
+          const nodeTitle = `🖥️ <b>${node.name || node.id}</b> (<code>${maskedIp}</code>)${node.isLocal ? ' <i>[Master]</i>' : ''}`;
 
-      for (const node of nodes) {
-        const maskedIp = depNodeManager.maskIp ? depNodeManager.maskIp(node.ip) : (node.ip ? `${node.ip.split('.')[0]}.***.***` : '');
-        const nodeTitle = `🖥️ <b>${node.name || node.id}</b> (<code>${maskedIp}</code>)${node.isLocal ? ' <i>[Master]</i>' : ''}`;
+          if (node.isLocal) {
+            try {
+              const [cpuLoad, memory, fileSystems] = await Promise.all([
+                depSi.currentLoad().catch(() => ({ currentLoad: 0 })),
+                depSi.mem().catch(() => ({ used: 0, total: 0, swapused: 0, swaptotal: 0 })),
+                depSi.fsSize().catch(() => []),
+              ]);
 
-        if (node.isLocal) {
-          try {
-            const [cpuLoad, memory, fileSystems] = await Promise.all([
-              depSi.currentLoad().catch(() => ({ currentLoad: 0 })),
-              depSi.mem().catch(() => ({ used: 0, total: 0, swapused: 0, swaptotal: 0 })),
-              depSi.fsSize().catch(() => []),
-            ]);
+              const rootDisk = (Array.isArray(fileSystems) && fileSystems.length > 0)
+                ? (fileSystems.find((item) => item.mount === '/') || fileSystems[0])
+                : { available: 0 };
 
-            const rootDisk = (Array.isArray(fileSystems) && fileSystems.length > 0)
-              ? (fileSystems.find((item) => item.mount === '/') || fileSystems[0])
-              : { available: 0 };
-
-            const cpuUsage = Number(cpuLoad?.currentLoad) || 0;
-            const ramUsagePercent = memory && memory.total ? (memory.used / memory.total) * 100 : 0;
-            const cpuWarn = cpuUsage >= 80 ? ' ⚠️' : '';
-            const ramWarn = ramUsagePercent >= 80 ? ' ⚠️' : '';
-
-            const lines = [
-              `• CPU: <b>${formatPercent(cpuUsage)}</b>${cpuWarn}`,
-              `• RAM: <b>${formatBytes(memory?.used || 0)} / ${formatBytes(memory?.total || 0)}</b> (${formatPercent(ramUsagePercent)})${ramWarn}`,
-            ];
-            if (memory?.swaptotal) {
-              lines.push(`• SWAP: <b>${formatBytes(memory?.swapused || 0)} / ${formatBytes(memory?.swaptotal || 0)}</b>`);
-            }
-            if (rootDisk?.available) {
-              lines.push(`• Disk (/): <b>${formatBytes(rootDisk?.available || 0)}</b> còn trống`);
-            }
-
-            nodeBlocks.push({ title: nodeTitle, lines });
-          } catch (localErr) {
-            nodeBlocks.push({
-              title: nodeTitle,
-              lines: [`• Trạng thái: ⚠️ <i>Lỗi đọc dữ liệu local (${localErr.message})</i>`],
-            });
-          }
-        } else {
-          try {
-            const res = await depNodeClient.getMetrics(node);
-            if (res && res.ok && res.metrics) {
-              const cpuUsage = Number(res.metrics.cpuLoad) || 0;
-              const memUsed = res.metrics.memory?.usedBytes || 0;
-              const memTotal = res.metrics.memory?.totalBytes || 0;
-              const ramUsagePercent = memTotal > 0
-                ? (memUsed / memTotal) * 100
-                : (Number(res.metrics.memory?.usedPercentage) || 0);
+              const cpuUsage = Number(cpuLoad?.currentLoad) || 0;
+              const ramUsagePercent = memory && memory.total ? (memory.used / memory.total) * 100 : 0;
               const cpuWarn = cpuUsage >= 80 ? ' ⚠️' : '';
               const ramWarn = ramUsagePercent >= 80 ? ' ⚠️' : '';
 
               const lines = [
                 `• CPU: <b>${formatPercent(cpuUsage)}</b>${cpuWarn}`,
-                `• RAM: <b>${formatBytes(memUsed)} / ${formatBytes(memTotal)}</b> (${formatPercent(ramUsagePercent)})${ramWarn}`,
+                `• RAM: <b>${formatBytes(memory?.used || 0)} / ${formatBytes(memory?.total || 0)}</b> (${formatPercent(ramUsagePercent)})${ramWarn}`,
               ];
-              nodeBlocks.push({ title: nodeTitle, lines });
-            } else {
-              nodeBlocks.push({
+              if (memory?.swaptotal) {
+                lines.push(`• SWAP: <b>${formatBytes(memory?.swapused || 0)} / ${formatBytes(memory?.swaptotal || 0)}</b>`);
+              }
+              if (rootDisk?.available) {
+                lines.push(`• Disk (/): <b>${formatBytes(rootDisk?.available || 0)}</b> còn trống`);
+              }
+
+              return { title: nodeTitle, lines };
+            } catch (localErr) {
+              return {
+                title: nodeTitle,
+                lines: [`• Trạng thái: ⚠️ <i>Lỗi đọc dữ liệu local (${localErr.message})</i>`],
+              };
+            }
+          } else {
+            try {
+              const res = await depNodeClient.getMetrics(node);
+              if (res && res.ok && res.metrics) {
+                const cpuUsage = Number(res.metrics.cpuLoad) || 0;
+                const memUsed = res.metrics.memory?.usedBytes || 0;
+                const memTotal = res.metrics.memory?.totalBytes || 0;
+                const ramUsagePercent = memTotal > 0
+                  ? (memUsed / memTotal) * 100
+                  : (Number(res.metrics.memory?.usedPercentage) || 0);
+                const cpuWarn = cpuUsage >= 80 ? ' ⚠️' : '';
+                const ramWarn = ramUsagePercent >= 80 ? ' ⚠️' : '';
+
+                const lines = [
+                  `• CPU: <b>${formatPercent(cpuUsage)}</b>${cpuWarn}`,
+                  `• RAM: <b>${formatBytes(memUsed)} / ${formatBytes(memTotal)}</b> (${formatPercent(ramUsagePercent)})${ramWarn}`,
+                ];
+                return { title: nodeTitle, lines };
+              }
+              return {
                 title: nodeTitle,
                 lines: [`• Trạng thái: 🔴 <i>Offline / Không phản hồi (${res?.error || 'Lỗi kết nối'})</i>`],
-              });
+              };
+            } catch (remoteErr) {
+              return {
+                title: nodeTitle,
+                lines: [`• Trạng thái: 🔴 <i>Offline / Không phản hồi (${remoteErr.message})</i>`],
+              };
             }
-          } catch (remoteErr) {
-            nodeBlocks.push({
-              title: nodeTitle,
-              lines: [`• Trạng thái: 🔴 <i>Offline / Không phản hồi (${remoteErr.message})</i>`],
-            });
           }
-        }
-      }
+        })
+      );
+
 
       const outputLines = [];
       outputLines.push('📊 <b>Báo cáo trạng thái máy chủ</b>\n');

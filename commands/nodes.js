@@ -35,35 +35,40 @@ module.exports = {
 
       const lines = ['🌐 <b>Danh sách máy chủ trong cụm Multi-VPS:</b>\n'];
 
-      for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i];
-        const maskedIp = depNodeManager.maskIp ? depNodeManager.maskIp(node.ip) : (node.ip || 'N/A');
-        let statusText = '';
+      const nodeItems = await Promise.all(
+        nodes.map(async (node, i) => {
+          const maskedIp = depNodeManager.maskIp ? depNodeManager.maskIp(node.ip) : (node.ip || 'N/A');
+          let statusText = '';
 
-        if (node.isLocal) {
-          statusText = '👑 <b>Master</b> (Online)';
-        } else {
-          const start = Date.now();
-          try {
-            const res = await depNodeClient.getMetrics(node);
-            const latency = Date.now() - start;
-            if (res && res.ok) {
-              statusText = `🟢 <b>Online</b> (${latency}ms)`;
-            } else {
-              statusText = `🔴 <b>Offline</b> (${escapeHtml(res?.error || 'Không phản hồi')})`;
+          if (node.isLocal) {
+            statusText = '👑 <b>Master</b> (Online)';
+          } else {
+            const start = Date.now();
+            try {
+              const res = await depNodeClient.getMetrics(node);
+              const latency = Date.now() - start;
+              if (res && res.ok) {
+                statusText = `🟢 <b>Online</b> (${latency}ms)`;
+              } else {
+                statusText = `🔴 <b>Offline</b> (${escapeHtml(res?.error || 'Không phản hồi')})`;
+              }
+            } catch (err) {
+              statusText = `🔴 <b>Offline</b> (${escapeHtml(err.message)})`;
             }
-          } catch (err) {
-            statusText = `🔴 <b>Offline</b> (${escapeHtml(err.message)})`;
           }
-        }
 
-        lines.push(`${i + 1}. <b>${escapeHtml(node.name || node.id)}</b> (<code>${escapeHtml(node.id)}</code>)`);
-        lines.push(`   • IP: <code>${escapeHtml(maskedIp)}</code>`);
-        lines.push(`   • Trạng thái: ${statusText}`);
-        if (i < nodes.length - 1) lines.push('');
-      }
+          const block = [
+            `${i + 1}. <b>${escapeHtml(node.name || node.id)}</b> (<code>${escapeHtml(node.id)}</code>)`,
+            `   • IP: <code>${escapeHtml(maskedIp)}</code>`,
+            `   • Trạng thái: ${statusText}`,
+          ];
+          return block.join('\n');
+        })
+      );
 
+      lines.push(nodeItems.join('\n\n'));
       await ctx.replyWithHTML(lines.join('\n'));
+
     } catch (error) {
       console.error('[NODES_COMMAND_ERROR]', error);
       await ctx.reply('⚠️ Không thể kiểm tra danh sách máy chủ lúc này.');
