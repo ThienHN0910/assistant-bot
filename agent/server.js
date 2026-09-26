@@ -1,7 +1,18 @@
 const http = require('http');
+const path = require('path');
 const crypto = require('crypto');
 const si = require('systeminformation');
 const agentSandbox = require('./agentSandbox');
+
+// Tự động nạp biến môi trường từ .env (thư mục gốc dự án hoặc thư mục agent)
+try {
+  const dotenv = require('dotenv');
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+  dotenv.config({ path: path.resolve(__dirname, '.env') });
+} catch {
+  // Bỏ qua nếu môi trường không có gói dotenv
+}
+
 
 const DEFAULT_MAX_JSON_BYTES = 1024 * 1024; // 1MB
 const DEFAULT_MAX_ZIP_BYTES = 50 * 1024 * 1024; // 50MB
