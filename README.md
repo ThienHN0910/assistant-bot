@@ -125,7 +125,15 @@ Trên Oracle Worker, đặt `WEB_DEPLOY_DIR=/var/www` trong `.env` của agent, 
 
 Trong OCI Console, mở **Networking → Virtual Cloud Networks → VCN → Security Lists** (hoặc Network Security Group gắn với instance), thêm ingress TCP 80 và 443 từ nguồn cần phục vụ. Oracle lưu ý phải kiểm tra cả quy tắc mạng OCI và firewall trong hệ điều hành: [OCI security rules](https://docs.oracle.com/en-us/iaas/Content/Security/Reference/configuration_tasks.htm).
 
-Trên máy Ubuntu dùng UFW, kiểm tra `sudo ufw status` rồi cho phép HTTP/HTTPS nếu UFW đang bật: `sudo ufw allow 80/tcp` và `sudo ufw allow 443/tcp`. Cuối cùng chạy `sudo nginx -t`, kiểm tra `systemctl status nginx`, và thử truy cập domain từ bên ngoài. Nếu `.env` của Worker đang chứa `WEB_DEPLOY_DIR` cũ, cập nhật giá trị đó trước khi restart agent.
+Trên máy Ubuntu dùng UFW, kiểm tra `sudo ufw status` rồi cho phép HTTP/HTTPS nếu UFW đang bật: `sudo ufw allow 80/tcp` và `sudo ufw allow 443/tcp`. Nếu máy dùng iptables, kiểm tra `sudo iptables -L INPUT -n --line-numbers`, rồi thêm quy tắc phù hợp với chính sách hiện có:
+
+```bash
+sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+sudo netfilter-persistent save # nếu đã cài netfilter-persistent
+```
+
+Cuối cùng chạy `sudo nginx -t`, kiểm tra `systemctl status nginx`, và thử truy cập domain từ bên ngoài. Nếu `.env` của Worker đang chứa `WEB_DEPLOY_DIR` cũ, cập nhật giá trị đó trước khi restart agent.
 
 ### 3. Cấu hình Nginx Reverse Proxy cho Dashboard
 Tạo file `/etc/nginx/sites-available/web-dashboard.conf`:

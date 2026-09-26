@@ -51,6 +51,36 @@ server {
 `.trim();
 }
 
+async function activateNginxConfig(confPath, contents, options = {}) {
+  const platform = options.platform || process.platform;
+  const command = options.runCommand || runCmd;
+  let previous = null;
+  try {
+    previous = await fs.readFile(confPath, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+
+  await fs.mkdir(path.dirname(confPath), { recursive: true });
+  await fs.writeFile(confPath, contents, 'utf8');
+  try {
+    if (platform === 'linux') {
+      const tested = await command('nginx', ['-t']);
+      if (!tested.ok) throw new Error(`nginx -t failed: ${tested.stderr}`);
+      const reloaded = await command('systemctl', ['reload', 'nginx']);
+      if (!reloaded.ok) throw new Error(`nginx reload failed: ${reloaded.stderr}`);
+    }
+  } catch (err) {
+    if (previous === null) await fs.rm(confPath, { force: true });
+    else await fs.writeFile(confPath, previous, 'utf8');
+    if (platform === 'linux') {
+      const restored = await command('nginx', ['-t']);
+      if (restored.ok) await command('systemctl', ['reload', 'nginx']);
+    }
+    throw err;
+  }
+}
+
 async function deployZipPayload(zipBuffer, projectName, subdomain, options = {}) {
   if (typeof projectName !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(projectName)) {
     throw new Error('Invalid project name');
@@ -128,16 +158,7 @@ async function deployZipPayload(zipBuffer, projectName, subdomain, options = {})
   const confPath = path.join(confDir, `${sanitizedName}.conf`);
 
   try {
-    await fs.mkdir(confDir, { recursive: true });
-    await fs.writeFile(confPath, vhostConfig, 'utf8');
-
-    // Test and reload Nginx if on Linux
-    if (process.platform === 'linux') {
-      const testRes = await runCmd('nginx', ['-t']);
-      if (!testRes.ok) throw new Error(`nginx -t failed: ${testRes.stderr}`);
-      const reload = await runCmd('systemctl', ['reload', 'nginx']);
-      if (!reload.ok) throw new Error(`nginx reload failed: ${reload.stderr}`);
-    }
+    await activateNginxConfig(confPath, vhostConfig);
   } catch (err) {
     throw new Error(`Nginx configuration failed: ${err.message}`);
   }
@@ -208,7 +229,7 @@ async function getProcessList() {
 
 async function getAgentLogs(lines = 20) {
   const logPath = process.env.PM2_ERROR_LOG_PATH;
-  if (!logPath) return { ok: false, error: 'PM2_ERROR_LOG_PATH is not configured' };
+  if (!logPath) return { ok: true, log: '(PM2_ERROR_LOG_PATH not set)' };
   let handle;
   try {
     handle = await fs.open(logPath, 'r');
@@ -240,6 +261,7 @@ async function cleanCacheAndLogs() {
 module.exports = {
   runCmd,
   generateNginxVhost,
+  activateNginxConfig,
   deployZipPayload,
   removeProject,
   runSelfUpdate,

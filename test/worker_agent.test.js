@@ -280,6 +280,24 @@ async function runTests() {
 
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-sandbox-test-'));
   try {
+    const oldLogPath = process.env.PM2_ERROR_LOG_PATH;
+    delete process.env.PM2_ERROR_LOG_PATH;
+    try {
+      assert.deepStrictEqual(await agentSandbox.getAgentLogs(5), { ok: true, log: '(PM2_ERROR_LOG_PATH not set)' });
+    } finally {
+      if (oldLogPath === undefined) delete process.env.PM2_ERROR_LOG_PATH;
+      else process.env.PM2_ERROR_LOG_PATH = oldLogPath;
+    }
+    const confPath = path.join(temp, 'site.conf');
+    await fs.writeFile(confPath, 'working config');
+    await assert.rejects(
+      agentSandbox.activateNginxConfig(confPath, 'broken config', {
+        platform: 'linux',
+        runCommand: async (command) => ({ ok: command !== 'nginx' || (await fs.readFile(confPath, 'utf8')) === 'working config', stderr: 'bad config' }),
+      }),
+      /nginx -t failed/
+    );
+    assert.strictEqual(await fs.readFile(confPath, 'utf8'), 'working config', 'failed activation restores prior config');
     await assert.rejects(
       agentSandbox.deployZipPayload(Buffer.from('x'), 'safe-name', 'bad;server_name injected', { webDeployDir: temp }),
       /Invalid subdomain/
