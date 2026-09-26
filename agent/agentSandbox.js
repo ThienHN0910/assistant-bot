@@ -81,6 +81,12 @@ async function activateNginxConfig(confPath, contents, options = {}) {
   }
 }
 
+function resolveWebDeployDir(options = {}) {
+  const directory = options.webDeployDir || process.env.WEB_DEPLOY_DIR;
+  if (!directory) throw new Error('WEB_DEPLOY_DIR must be configured in worker .env');
+  return directory;
+}
+
 async function deployZipPayload(zipBuffer, projectName, subdomain, options = {}) {
   if (typeof projectName !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(projectName)) {
     throw new Error('Invalid project name');
@@ -92,7 +98,7 @@ async function deployZipPayload(zipBuffer, projectName, subdomain, options = {})
   }
   const baseDomain = process.env.BASE_DOMAIN || options.baseDomain || 'thienhn.io.vn';
   const domain = `${effectiveSub}.${baseDomain}`;
-  const webDeployDir = options.webDeployDir || process.env.WEB_DEPLOY_DIR || '/var/www';
+  const webDeployDir = resolveWebDeployDir(options);
   const targetDir = path.join(webDeployDir, sanitizedName);
 
   await fs.mkdir(targetDir, { recursive: true });
@@ -178,7 +184,7 @@ async function removeProject(projectName, options = {}) {
     throw new Error('Invalid project name');
   }
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
-  const webDeployDir = options.webDeployDir || process.env.WEB_DEPLOY_DIR || '/var/www';
+  const webDeployDir = resolveWebDeployDir(options);
   const targetDir = path.join(webDeployDir, sanitizedName);
 
   await fs.rm(targetDir, { recursive: true, force: true }).catch(() => {});
@@ -262,6 +268,7 @@ module.exports = {
   runCmd,
   generateNginxVhost,
   activateNginxConfig,
+  resolveWebDeployDir,
   deployZipPayload,
   removeProject,
   runSelfUpdate,

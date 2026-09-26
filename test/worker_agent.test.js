@@ -280,6 +280,15 @@ async function runTests() {
 
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-sandbox-test-'));
   try {
+    const oldDeployDir = process.env.WEB_DEPLOY_DIR;
+    delete process.env.WEB_DEPLOY_DIR;
+    try {
+      assert.throws(() => agentSandbox.resolveWebDeployDir({}), /WEB_DEPLOY_DIR/);
+      assert.strictEqual(agentSandbox.resolveWebDeployDir({ webDeployDir: temp }), temp);
+    } finally {
+      if (oldDeployDir === undefined) delete process.env.WEB_DEPLOY_DIR;
+      else process.env.WEB_DEPLOY_DIR = oldDeployDir;
+    }
     const oldLogPath = process.env.PM2_ERROR_LOG_PATH;
     delete process.env.PM2_ERROR_LOG_PATH;
     try {
