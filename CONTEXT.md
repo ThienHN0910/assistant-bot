@@ -47,3 +47,24 @@ _Avoid_: Admin password, login key.
 **Feature Flag**:
 A dynamic capability switch determined at runtime based on the availability of target provider credentials.
 _Avoid_: Configuration toggle, option switch.
+
+**Cluster Node**:
+A specific managed server participating in the multi-VPS topology, either as the Master Controller or an enrolled Worker Node.
+_Avoid_: Machine, host, box.
+
+**Master Controller**:
+The designated primary VPS host (GCP) running the single Telegram bot instance, Web Dashboard, and Cloudflare DNS automation.
+_Avoid_: Main bot, server 1.
+
+**Worker Agent**:
+A lightweight HTTP/REST micro-daemon (`assistant-node-agent`) executing on a secondary or edge VPS, handling local sandbox operations, Nginx configurations, and system metrics.
+_Avoid_: Sub-bot, slave bot.
+
+**Node Registry**:
+The persistent store maintaining enrolled cluster nodes, endpoints, masked identities, and communication secrets.
+_Avoid_: Node list, server config.
+
+**Target Node**:
+The specific Cluster Node selected by the operator to host and serve a VPS-bound application origin.
+_Avoid_: Destination server, chosen box.
+

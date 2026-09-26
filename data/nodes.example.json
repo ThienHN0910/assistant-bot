@@ -1,0 +1,18 @@
+[
+  {
+    "id": "gcp-master",
+    "name": "GCP e2-micro (Master)",
+    "ip": "192.0.2.1",
+    "isLocal": true,
+    "status": "online"
+  },
+  {
+    "id": "oracle-worker",
+    "name": "Oracle Cloud VM",
+    "ip": "198.51.100.1",
+    "agentUrl": "http://198.51.100.1:3001",
+    "secret": "CHANGE_ME_ORACLE_AGENT_SECRET",
+    "isLocal": false,
+    "status": "online"
+  }
+]

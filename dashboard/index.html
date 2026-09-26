@@ -631,9 +631,133 @@
         </button>
       </div>
 
-      <!-- TAB 1: SYSTEM TELEMETRY -->
-      <section v-if="dashTab === 'telemetry' && system" class="space-y-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- TAB 1: SYSTEM & MULTI-NODE CLUSTER TELEMETRY -->
+      <section v-if="dashTab === 'telemetry' && (system || clusterNodes.length > 0)" class="space-y-6">
+        <!-- Cluster Header -->
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <span>🌐</span> Cụm Máy Chủ Multi-VPS ({{ clusterNodes.length || 1 }} Nodes)
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Giám sát tài nguyên phần cứng thời gian thực cho từng node máy chủ trong cụm</p>
+          </div>
+          <button 
+            @click="fetchData" 
+            :disabled="refreshing"
+            class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-xl text-xs flex items-center gap-1.5 transition-all">
+            <span :class="{ 'animate-spin': refreshing }">🔄</span> Làm mới
+          </button>
+        </div>
+
+        <!-- Multi-Node Cluster Cards (Side-by-side grid) -->
+        <div v-if="clusterNodes.length > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div 
+            v-for="(node, index) in clusterNodes" 
+            :key="node.id"
+            class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden flex flex-col justify-between">
+            
+            <!-- Node Header -->
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                  :class="node.isLocal ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'">
+                  {{ node.isLocal ? '🖥️' : '☁️' }}
+                </div>
+                <div>
+                  <div class="font-bold text-white flex items-center gap-2">
+                    {{ node.name }}
+                    <span 
+                      class="text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold"
+                      :class="node.isLocal ? 'bg-brand-500/20 text-brand-300 border border-brand-500/30' : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'">
+                      {{ node.isLocal ? 'Master' : 'Worker' }}
+                    </span>
+                  </div>
+                  <div class="text-xs text-slate-400 font-mono mt-0.5 flex items-center gap-2">
+                    <span>IP: {{ node.ipMasked }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Node Status Badge -->
+              <div>
+                <span 
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                  :class="node.status === 'online' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'">
+                  <span class="w-2 h-2 rounded-full" :class="node.status === 'online' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'"></span>
+                  {{ node.status === 'online' ? 'Online' : 'Offline' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- 4 Metrics for Node: CPU, RAM, Disk, Uptime -->
+            <div class="grid grid-cols-2 gap-3 mb-4">
+              <!-- CPU -->
+              <div class="bg-slate-950/70 border border-slate-800/80 p-3.5 rounded-2xl">
+                <div class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Tải CPU</span>
+                  <span class="font-mono font-bold text-white">{{ node.cpuLoad }}%</span>
+                </div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                  <div 
+                    class="h-full rounded-full transition-all duration-500" 
+                    :class="node.cpuLoad >= 80 ? 'bg-rose-500' : (node.cpuLoad >= 50 ? 'bg-amber-500' : 'bg-brand-500')"
+                    :style="{ width: `${node.cpuLoad}%` }">
+                  </div>
+                </div>
+              </div>
+
+              <!-- RAM -->
+              <div class="bg-slate-950/70 border border-slate-800/80 p-3.5 rounded-2xl">
+                <div class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Bộ Nhớ RAM</span>
+                  <span class="font-mono font-bold text-white">{{ node.memory?.usedPercentage || 0 }}%</span>
+                </div>
+                <div class="text-[11px] text-slate-400 truncate mt-0.5">{{ node.memory?.formatted || 'N/A' }}</div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                  <div 
+                    class="h-full rounded-full transition-all duration-500" 
+                    :class="(node.memory?.usedPercentage || 0) >= 80 ? 'bg-rose-500' : 'bg-emerald-500'"
+                    :style="{ width: `${node.memory?.usedPercentage || 0}%` }">
+                  </div>
+                </div>
+              </div>
+
+              <!-- DISK -->
+              <div class="bg-slate-950/70 border border-slate-800/80 p-3.5 rounded-2xl">
+                <div class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Ổ Đĩa</span>
+                  <span class="font-mono font-bold text-white">{{ node.disk?.usedPercentage || 0 }}%</span>
+                </div>
+                <div class="text-[11px] text-slate-400 truncate mt-0.5">{{ node.disk?.formatted || 'N/A' }}</div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                  <div 
+                    class="h-full rounded-full transition-all duration-500" 
+                    :class="(node.disk?.usedPercentage || 0) >= 90 ? 'bg-rose-500' : 'bg-brand-500'"
+                    :style="{ width: `${node.disk?.usedPercentage || 0}%` }">
+                  </div>
+                </div>
+              </div>
+
+              <!-- UPTIME -->
+              <div class="bg-slate-950/70 border border-slate-800/80 p-3.5 rounded-2xl flex flex-col justify-between">
+                <div class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider mb-1">Thời Gian Chạy</div>
+                <div class="font-mono font-bold text-slate-200 text-sm mt-0.5">{{ node.uptimeFormatted }}</div>
+                <div class="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> {{ node.status === 'online' ? 'Node hoạt động tốt' : 'Node ngoại tuyến' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Error message if any -->
+            <div v-if="node.error" class="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{{ node.error }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fallback if clusterNodes empty: Single Server View -->
+        <div v-else-if="system" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- CPU -->
           <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
             <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Tải CPU</div>
@@ -688,11 +812,11 @@
         <!-- System Quick Actions & Bot Health Banner -->
         <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h3 class="text-base font-bold text-white">Trạng Thái Watchdog & PM2</h3>
-            <p class="text-slate-400 text-xs mt-0.5">Tiến trình bot được bảo vệ nghiêm ngặt với trần RAM 200MB và tự động cảnh báo qua Telegram khi tài nguyên vượt 85%.</p>
+            <h3 class="text-base font-bold text-white">Cụm Multi-VPS & Watchdog Cluster</h3>
+            <p class="text-slate-400 text-xs mt-0.5">Tiến trình bot được điều phối an toàn qua Nginx reverse proxy với phân tán tải thông minh và trần RAM nghiêm ngặt 200MB.</p>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-400">Gõ <code>/status</code> trên Telegram để xem tức thì.</span>
+            <span class="text-xs text-slate-400">Gõ <code>/status</code> hoặc <code>/nodes</code> trên Telegram để xem tức thì.</span>
           </div>
         </div>
       </section>
@@ -750,16 +874,17 @@
                   <span>{{ dep.name }}</span>
                 </td>
 
-                <!-- Target -->
+                <!-- Target / Node Badge -->
                 <td class="px-6 py-4">
                   <span 
                     class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold"
                     :class="{
-                      'bg-sky-500/10 text-sky-400 border border-sky-500/20': dep.target === 'vps',
+                      'bg-sky-500/10 text-sky-400 border border-sky-500/20': dep.target === 'vps' && (!dep.nodeId || dep.nodeId === 'gcp-master'),
+                      'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20': dep.target === 'vps' && dep.nodeId && dep.nodeId !== 'gcp-master',
                       'bg-white/10 text-white border border-white/20': dep.target === 'vercel',
                       'bg-purple-500/10 text-purple-400 border border-purple-500/20': dep.target === 'render'
                     }">
-                    {{ dep.target === 'vps' ? '💻 VPS' : (dep.target === 'vercel' ? '▲ Vercel' : '🔷 Render') }}
+                    {{ getNodeBadgeLabel(dep) }}
                   </span>
                 </td>
 
@@ -1013,6 +1138,35 @@
               </div>
             </div>
 
+            <!-- Node Selector for VPS deployment when >1 node exists -->
+            <div v-if="newDeploy.target === 'vps' && nodes.length > 1" class="space-y-2">
+              <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Chọn Máy Chủ VPS Đích (Cluster Node)
+              </label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button 
+                  type="button"
+                  v-for="n in nodes"
+                  :key="n.id"
+                  @click="newDeploy.nodeId = n.id"
+                  :class="newDeploy.nodeId === n.id ? 'border-brand-500 bg-brand-500/15 text-brand-200 ring-1 ring-brand-500/50' : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700'"
+                  class="p-2.5 border rounded-xl text-xs text-left transition-all flex items-center justify-between">
+                  <div>
+                    <div class="font-semibold text-white flex items-center gap-1.5">
+                      <span>{{ n.isLocal ? '🖥️' : '☁️' }}</span>
+                      <span>{{ n.name }}</span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 font-mono mt-0.5">{{ n.ipMasked }}</div>
+                  </div>
+                  <span 
+                    class="text-[10px] px-2 py-0.5 rounded-full font-mono"
+                    :class="newDeploy.nodeId === n.id ? 'bg-brand-500 text-white font-bold' : 'bg-slate-800 text-slate-400'">
+                    {{ n.isLocal ? 'Master' : 'Worker' }}
+                  </span>
+                </button>
+              </div>
+            </div>
+
             <div>
               <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tên miền phụ (Subdomain)</label>
               <div class="flex items-center">
@@ -1026,7 +1180,7 @@
                 </span>
               </div>
               <div class="text-[11px] text-slate-500 mt-1">
-                ☁️ Cloudflare DNS: Bản ghi {{ newDeploy.target === 'vps' ? 'A trỏ về IP của VPS' : 'CNAME trỏ về cname.vercel-dns.com' }}
+                ☁️ Cloudflare DNS: Bản ghi {{ newDeploy.target === 'vps' ? 'A trỏ về IP của node được chọn' : 'CNAME trỏ về cname.vercel-dns.com' }}
               </div>
             </div>
           </div>
@@ -1087,6 +1241,8 @@
 
         // Dashboard Data
         const system = ref(null);
+        const clusterNodes = ref([]);
+        const nodes = ref([]);
         const deployments = ref([]);
         const refreshing = ref(false);
         const targetFilter = ref('all');
@@ -1509,17 +1665,35 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
         // =====================================================================
         // DASHBOARD DATA FETCHING
         // =====================================================================
+        async function fetchNodes() {
+          try {
+            const res = await fetch('/api/nodes').then((r) => r.json());
+            if (res.ok && Array.isArray(res.nodes)) {
+              nodes.value = res.nodes;
+            }
+          } catch {}
+        }
+
         async function fetchData() {
           if (!isAuthenticated.value) return;
           refreshing.value = true;
           try {
-            const [sysRes, depRes] = await Promise.all([
+            const [sysRes, depRes, nodesRes] = await Promise.all([
               apiRequest('/api/status').catch(() => null),
-              apiRequest('/api/deployments').catch(() => null)
+              apiRequest('/api/deployments').catch(() => null),
+              fetch('/api/nodes').then((r) => r.json()).catch(() => null),
             ]);
 
-            if (sysRes?.ok) system.value = sysRes.system;
+            if (sysRes?.ok) {
+              system.value = sysRes.system;
+              if (Array.isArray(sysRes.nodes)) {
+                clusterNodes.value = sysRes.nodes;
+              }
+            }
             if (depRes?.ok) deployments.value = depRes.deployments;
+            if (nodesRes?.ok && Array.isArray(nodesRes.nodes)) {
+              nodes.value = nodesRes.nodes;
+            }
           } catch (err) {
             showToast(err.message, 'error');
           } finally {
@@ -1559,6 +1733,7 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
         const newDeploy = ref({
           repoUrl: '',
           target: 'vps',
+          nodeId: 'gcp-master',
           subdomain: '',
           baseDomain: 'thienhn.io.vn',
           inspection: null,
@@ -1570,12 +1745,14 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           newDeploy.value = {
             repoUrl: '',
             target: 'vps',
+            nodeId: nodes.value[0]?.id || 'gcp-master',
             subdomain: '',
             baseDomain: 'thienhn.io.vn',
             inspection: null,
             inspectError: '',
             deployError: '',
           };
+          fetchNodes();
           showDeployModal.value = true;
         }
 
@@ -1642,13 +1819,17 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
                 newDeploy.value.deployError = feRes.error || beRes.error || 'Lỗi khi triển khai monorepo';
               }
             } else {
+              const deployPayload = {
+                repoUrl: newDeploy.value.repoUrl,
+                target: newDeploy.value.target,
+                subdomain: newDeploy.value.subdomain,
+              };
+              if (newDeploy.value.target === 'vps' && newDeploy.value.nodeId) {
+                deployPayload.nodeId = newDeploy.value.nodeId;
+              }
               const res = await apiRequest('/api/deployments/deploy-git', {
                 method: 'POST',
-                body: JSON.stringify({
-                  repoUrl: newDeploy.value.repoUrl,
-                  target: newDeploy.value.target,
-                  subdomain: newDeploy.value.subdomain,
-                }),
+                body: JSON.stringify(deployPayload),
               });
 
               if (res.ok) {
@@ -1676,6 +1857,18 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           });
         });
 
+        function getNodeBadgeLabel(dep) {
+          if (dep.target === 'vercel') return '▲ Vercel';
+          if (dep.target === 'render') return '🔷 Render';
+          if (dep.target === 'vps') {
+            const foundNode = nodes.value.find((n) => n.id === dep.nodeId);
+            if (foundNode) return `💻 ${foundNode.name}`;
+            if (dep.nodeId === 'oracle-worker') return '💻 Oracle Cloud';
+            return '💻 GCP Master';
+          }
+          return dep.target || 'N/A';
+        }
+
         function formatDate(isoStr) {
           if (!isoStr) return 'N/A';
           try {
@@ -1695,6 +1888,7 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
         onMounted(() => {
           verifySession();
           initGoogleAuth();
+          fetchNodes();
         });
 
         return {
@@ -1709,6 +1903,8 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           currentTab,
           dashTab,
           system,
+          clusterNodes,
+          nodes,
           deployments,
           refreshing,
           targetFilter,
@@ -1724,6 +1920,7 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           getCategoryCount,
           filteredCommands,
           fetchData,
+          fetchNodes,
           confirmUndeploy,
           showDeployModal,
           inspectingRepo,
@@ -1734,6 +1931,7 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           inspectRepo,
           executeDeploy,
           filteredDeployments,
+          getNodeBadgeLabel,
           formatDate,
           logout,
         };
