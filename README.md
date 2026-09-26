@@ -121,6 +121,16 @@ pm2 save
 
 ### Oracle Worker: chuẩn bị đường dẫn deploy và cổng web
 
+Worker có bộ phụ thuộc riêng. Sau khi clone hoặc cập nhật repo, chạy `npm ci --prefix agent --omit=dev` từ thư mục gốc rồi `pm2 restart assistant-node-agent --update-env`. `agent/server.js` nạp `.env` ở thư mục gốc repo; nếu thiếu gói `dotenv`, worker sẽ dừng khi khởi động thay vì chạy với cấu hình rỗng.
+
+Nếu gỡ một deploy thất bại báo `no owned DNS record ID`, kiểm tra `status`, `domain` và `dnsRecordId` của dự án trong registry trên Master, rồi kiểm tra record cùng domain trong Cloudflare DNS. Bot không tự xóa record chưa chứng minh được quyền sở hữu. Với record do bạn tạo thủ công và đã xác nhận không phục vụ site khác, hãy xử lý record đó trong Cloudflare rồi thử gỡ hoặc deploy lại. Không sửa `dnsRecordId` trong registry để vượt qua kiểm tra quyền sở hữu.
+
+Registry mặc định là `data/deployments.json` trên Master (có thể đổi bằng `DEPLOY_REGISTRY_PATH`). Từ thư mục gốc repo, xem riêng trạng thái của một dự án bằng lệnh sau; thay `test2` bằng tên dự án của bạn. Lệnh chỉ in các trường không chứa khóa bí mật:
+
+```bash
+node -e 'require("dotenv").config({quiet:true}); const fs=require("fs"), path=require("path"); const file=path.resolve(process.env.DEPLOY_REGISTRY_PATH||"data/deployments.json"); const item=JSON.parse(fs.readFileSync(file,"utf8")).find(d=>d.name===process.argv[1]); console.log(item?JSON.stringify({status:item.status,domain:item.domain,nodeId:item.nodeId,hasDnsRecordId:!!item.dnsRecordId}):"not found")' test2
+```
+
 Trên Oracle Worker, đặt `WEB_DEPLOY_DIR` thành đường dẫn tuyệt đối trong `.env` ở gốc repo, cài `unzip` và bảo đảm tài khoản chạy agent có quyền tạo thư mục tại đó. Nếu dùng thư mục trong home, Nginx còn cần quyền đi qua các thư mục cha; kiểm tra bằng `namei -l "$HOME/web"`. Agent chạy dưới tài khoản thường nhưng dùng `sudo -n` để cài/gỡ cấu hình site trong `/etc/nginx/conf.d`, chạy `nginx -t` và reload Nginx. Tài khoản chạy agent phải có sudo không cần mật khẩu cho `install`, `rm`, `nginx -t` và `systemctl reload nginx`; kiểm tra bằng `sudo -n -l` và `sudo -n nginx -t`. Phiên bản worker này chưa hỗ trợ helper sudo riêng. Không mở quyền ghi cho cả `/etc/nginx/conf.d`. Nếu bước cài đặt hoặc reload thất bại, bot sẽ hiển thị lỗi Oracle trả về.
 
 Trong OCI Console, mở **Networking → Virtual Cloud Networks → VCN → Security Lists** (hoặc Network Security Group gắn với instance), thêm ingress TCP 80 và 443 từ nguồn cần phục vụ. Oracle lưu ý phải kiểm tra cả quy tắc mạng OCI và firewall trong hệ điều hành: [OCI security rules](https://docs.oracle.com/en-us/iaas/Content/Security/Reference/configuration_tasks.htm).
