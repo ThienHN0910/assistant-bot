@@ -8,7 +8,7 @@ const deployer = require('../lib/deployer');
 const repoInspector = require('../lib/repoInspector');
 const nodeManager = require('../lib/nodeManager');
 const nodeClient = require('../lib/nodeClient');
-const { formatFileSize } = require('../config/utils');
+const { formatFileSize, readLastLines } = require('../config/utils');
 
 let serverInstance = null;
 
@@ -524,6 +524,107 @@ function createDashboardServer(config, deps = {}) {
         }
         const result = await depDeployer.undeploy(body.name, config);
         sendJson(res, 200, { ok: true, undeployed: result });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    // 10. Top Processes (/ps)
+    if (pathname === '/api/processes' && req.method === 'GET') {
+      try {
+        const requestedNodeId = urlObj.searchParams.get('nodeId');
+        let selectedNode = null;
+        if (requestedNodeId) {
+          selectedNode = await depNodeManager.getNode(requestedNodeId, config);
+        } else {
+          selectedNode = await depNodeManager.getNode('gcp-master', config).catch(() => ({ id: 'gcp-master', name: 'Master', isLocal: true }));
+        }
+
+        if (!selectedNode) {
+          sendJson(res, 404, { ok: false, error: 'Không tìm thấy node' });
+          return;
+        }
+
+        let rawProcesses = [];
+        if (selectedNode.isLocal) {
+          const procs = await depSi.processes().catch(() => ({ list: [] }));
+          rawProcesses = procs.list || [];
+        } else {
+          const remoteRes = await depNodeClient.getProcesses(selectedNode, httpClient);
+          if (!remoteRes.ok) {
+            sendJson(res, 502, { ok: false, error: remoteRes.error || 'Không thể lấy tiến trình từ worker' });
+            return;
+          }
+          rawProcesses = remoteRes.processes || [];
+        }
+
+        const sorted = [...rawProcesses]
+          .sort((a, b) => (Number(b.mem) || 0) - (Number(a.mem) || 0))
+          .slice(0, 10)
+          .map((p) => ({
+            pid: Number(p.pid) || 0,
+            name: p.name || 'unknown',
+            mem: Number(p.mem) || 0,
+            cpu: Number(p.cpu) || 0,
+            user: p.user || 'root',
+          }));
+
+        sendJson(res, 200, {
+          ok: true,
+          node: { id: selectedNode.id, name: selectedNode.name || selectedNode.id },
+          processes: sorted,
+        });
+      } catch (err) {
+        sendJson(res, 500, { ok: false, error: err.message });
+      }
+      return;
+    }
+
+    // 11. PM2 Logs (/logs)
+    if (pathname === '/api/logs' && req.method === 'GET') {
+      try {
+        const requestedNodeId = urlObj.searchParams.get('nodeId');
+        const count = Math.max(1, Math.min(Number(urlObj.searchParams.get('lines')) || 20, 200));
+        let selectedNode = null;
+        if (requestedNodeId) {
+          selectedNode = await depNodeManager.getNode(requestedNodeId, config);
+        } else {
+          selectedNode = await depNodeManager.getNode('gcp-master', config).catch(() => ({ id: 'gcp-master', name: 'Master', isLocal: true }));
+        }
+
+        if (!selectedNode) {
+          sendJson(res, 404, { ok: false, error: 'Không tìm thấy node' });
+          return;
+        }
+
+        let logsText = '';
+        if (selectedNode.isLocal) {
+          const logPath = config?.pm2ErrorLogPath || process.env.PM2_ERROR_LOG_PATH;
+          if (!logPath) {
+            logsText = 'Chưa cấu hình PM2_ERROR_LOG_PATH';
+          } else {
+            try {
+              await fs.access(logPath);
+              logsText = await readLastLines(logPath, count);
+            } catch {
+              logsText = 'Không tìm thấy file log PM2 tại ' + logPath;
+            }
+          }
+        } else {
+          const remoteRes = await depNodeClient.getLogs(selectedNode, count, httpClient);
+          if (!remoteRes.ok) {
+            sendJson(res, 502, { ok: false, error: remoteRes.error || 'Không thể lấy log từ worker' });
+            return;
+          }
+          logsText = remoteRes.log || '';
+        }
+
+        sendJson(res, 200, {
+          ok: true,
+          node: { id: selectedNode.id, name: selectedNode.name || selectedNode.id },
+          logs: logsText,
+        });
       } catch (err) {
         sendJson(res, 500, { ok: false, error: err.message });
       }
