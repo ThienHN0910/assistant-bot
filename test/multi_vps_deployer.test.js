@@ -133,6 +133,36 @@ async function runTests() {
   assert.strictEqual(localPassedDns.ip, '104.198.1.1');
   assert.strictEqual(localResult.deployment.nodeId, 'gcp-master');
 
+  // Test 4: Deploy remote node with github_public removes staging zip on master
+  const stagingZip = path.join(tmpDir, 'staging-app-gh.zip');
+  const githubMockDeps = {
+    ...mockDeps,
+    inspector: {
+      inspectRepo: async () => ({ type: 'static_pure', owner: 'user', repo: 'repo' }),
+    },
+    downloadGithubZip: async (owner, repo, dest) => {
+      await fs.writeFile(dest, 'downloaded-zip-data');
+    },
+  };
+  await deployer.deploy(
+    {
+      source: 'github_public',
+      repoUrl: 'https://github.com/user/repo',
+      projectName: 'staging-app',
+      target: 'vps',
+      nodeId: 'oracle-worker',
+    },
+    { ...config, uploadDir: tmpDir },
+    githubMockDeps
+  );
+  let fileExists = true;
+  try {
+    await fs.access(stagingZip);
+  } catch {
+    fileExists = false;
+  }
+  assert.strictEqual(fileExists, false, 'Temporary staging zip on master must be deleted after remote deploy');
+
   console.log('✅ multi-vps deployer tests passed');
   await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
 }

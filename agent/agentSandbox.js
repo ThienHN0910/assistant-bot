@@ -51,9 +51,26 @@ server {
 `.trim();
 }
 
+function resolveNginxPaths(sanitizedName, options = {}) {
+  if (options.nginxConfDir) {
+    return {
+      availablePath: path.join(options.nginxConfDir, `${sanitizedName}.conf`),
+      enabledPath: null,
+    };
+  }
+  const availableDir = options.nginxAvailableDir || '/etc/nginx/sites-available';
+  const enabledDir = options.nginxEnabledDir || '/etc/nginx/sites-enabled';
+  const siteName = `web-${sanitizedName}`;
+  return {
+    availablePath: path.join(availableDir, siteName),
+    enabledPath: path.join(enabledDir, siteName),
+  };
+}
+
 async function activateNginxConfig(confPath, contents, options = {}) {
   const platform = options.platform || process.platform;
   const command = options.runCommand || runCmd;
+  const enabledPath = options.enabledPath || null;
   let previous = null;
   try {
     previous = await fs.readFile(confPath, 'utf8');
@@ -64,9 +81,11 @@ async function activateNginxConfig(confPath, contents, options = {}) {
   async function changeConfig(value) {
     if (value === null) {
       if (platform === 'linux') {
+        if (enabledPath) await command('sudo', ['-n', 'rm', '-f', enabledPath]);
         const removed = await command('sudo', ['-n', 'rm', '-f', confPath]);
         if (!removed.ok) throw new Error(`Nginx config removal failed: ${removed.stderr}`);
       } else {
+        if (enabledPath) await fs.rm(enabledPath, { force: true }).catch(() => {});
         await fs.rm(confPath, { force: true });
       }
       return;
@@ -78,9 +97,17 @@ async function activateNginxConfig(confPath, contents, options = {}) {
       if (platform === 'linux') {
         const installed = await command('sudo', ['-n', 'install', '-m', '644', tempPath, confPath]);
         if (!installed.ok) throw new Error(`Nginx config install failed: ${installed.stderr}`);
+        if (enabledPath) {
+          const linked = await command('sudo', ['-n', 'ln', '-sf', confPath, enabledPath]);
+          if (!linked.ok) throw new Error(`Nginx symlink failed: ${linked.stderr}`);
+        }
       } else {
         await fs.mkdir(path.dirname(confPath), { recursive: true });
         await fs.copyFile(tempPath, confPath);
+        if (enabledPath) {
+          await fs.mkdir(path.dirname(enabledPath), { recursive: true });
+          await fs.copyFile(tempPath, enabledPath);
+        }
       }
     } finally {
       await fs.rm(tempDir, { recursive: true, force: true });
@@ -114,6 +141,11 @@ async function activateNginxConfig(confPath, contents, options = {}) {
 function resolveWebDeployDir(options = {}) {
   const directory = options.webDeployDir || process.env.WEB_DEPLOY_DIR;
   if (!directory) throw new Error('WEB_DEPLOY_DIR must be configured in worker .env');
+  return directory;
+}
+
+function resolveUploadDir(options = {}) {
+  const directory = options.uploadDir || process.env.UPLOAD_DIR || path.join(process.env.HOME || '/home/ubuntu', 'uploads');
   return directory;
 }
 
@@ -180,6 +212,13 @@ async function deployZipPayload(zipBuffer, projectName, subdomain, options = {})
     if (!permissions.ok) throw new Error(`Cannot make deployed files readable: ${permissions.stderr}`);
   }
 
+  // Persist backup ZIP in worker uploads directory
+  try {
+    const uploadDir = resolveUploadDir(options);
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.writeFile(path.join(uploadDir, `${sanitizedName}.zip`), zipBuffer);
+  } catch {}
+
   // Generate Nginx configuration
   const sslCert = process.env.SSL_CERT_PATH || options.sslCert || '/etc/ssl/certs/cloudflare_cert.pem';
   const sslKey = process.env.SSL_KEY_PATH || options.sslKey || '/etc/ssl/private/cloudflare_key.key';
@@ -190,11 +229,10 @@ async function deployZipPayload(zipBuffer, projectName, subdomain, options = {})
     sslKey,
   });
 
-  const confDir = options.nginxConfDir || '/etc/nginx/conf.d';
-  const confPath = path.join(confDir, `${sanitizedName}.conf`);
+  const { availablePath, enabledPath } = resolveNginxPaths(sanitizedName, options);
 
   try {
-    await activateNginxConfig(confPath, vhostConfig);
+    await activateNginxConfig(availablePath, vhostConfig, { ...options, enabledPath });
   } catch (err) {
     throw new Error(`Nginx configuration failed: ${err.message}`);
   }
@@ -216,9 +254,13 @@ async function removeProject(projectName, options = {}) {
   const sanitizedName = projectName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
   const webDeployDir = resolveWebDeployDir(options);
   const targetDir = path.join(webDeployDir, sanitizedName);
-  const confDir = options.nginxConfDir || '/etc/nginx/conf.d';
-  const confPath = path.join(confDir, `${sanitizedName}.conf`);
-  await activateNginxConfig(confPath, null, options);
+  const { availablePath, enabledPath } = resolveNginxPaths(sanitizedName, options);
+  await activateNginxConfig(availablePath, null, { ...options, enabledPath });
+
+  try {
+    const uploadDir = resolveUploadDir(options);
+    await fs.rm(path.join(uploadDir, `${sanitizedName}.zip`), { force: true });
+  } catch {}
 
   await fs.rm(targetDir, { recursive: true, force: true });
 
@@ -290,7 +332,9 @@ module.exports = {
   runCmd,
   generateNginxVhost,
   activateNginxConfig,
+  resolveNginxPaths,
   resolveWebDeployDir,
+  resolveUploadDir,
   deployZipPayload,
   removeProject,
   runSelfUpdate,
