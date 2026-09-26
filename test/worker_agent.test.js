@@ -1,6 +1,12 @@
 const assert = require('assert');
 const http = require('http');
-const { createAgentServer } = require('../agent/server');
+const { EventEmitter } = require('events');
+const {
+  createAgentServer,
+  checkAgentAuth,
+  parseJsonBody,
+  parseBufferBody,
+} = require('../agent/server');
 
 async function makeRequest(server, options, bodyData = null) {
   const addr = server.address();
@@ -47,6 +53,8 @@ async function runTests() {
     secret,
     sandbox: mockSandbox,
     autoRestart: false,
+    maxJsonBytes: 100,
+    maxZipBytes: 200,
     metricsProvider: async () => ({
       cpuLoad: 15,
       memory: { usedBytes: 300000000, totalBytes: 1000000000, usedPercentage: 30 },
@@ -164,10 +172,84 @@ async function runTests() {
     });
     assert.strictEqual(notFound.status, 404);
 
-    console.log('✅ worker agent server tests passed');
+    // 12. Max payload size guard for JSON (exceeds maxJsonBytes=100) -> 413
+    const oversizedJson = JSON.stringify({ projectName: 'a'.repeat(150) });
+    const jsonOverflow = await makeRequest(server, {
+      path: '/api/undeploy',
+      method: 'POST',
+      headers: {
+        'X-Agent-Secret': secret,
+        'Content-Type': 'application/json',
+      },
+    }, oversizedJson);
+    assert.strictEqual(jsonOverflow.status, 413);
+
+    // 13. Max payload size guard for ZIP binary (exceeds maxZipBytes=200) -> 413
+    const oversizedZip = Buffer.alloc(250, 'Z');
+    const zipOverflow = await makeRequest(server, {
+      path: '/api/deploy',
+      method: 'POST',
+      headers: {
+        'X-Agent-Secret': secret,
+        'X-Project-Name': 'large-project',
+      },
+    }, oversizedZip);
+    assert.strictEqual(zipOverflow.status, 413);
+
+    console.log('✅ worker agent server standard & size tests passed');
   } finally {
     server.close();
   }
+
+  // 14. Fail-closed auth test when NODE_AGENT_SECRET is unset
+  const unconfiguredServer = createAgentServer({
+    secret: '',
+    metricsProvider: async () => ({ cpuLoad: 5 }),
+  });
+  await new Promise((resolve) => unconfiguredServer.listen(0, resolve));
+  try {
+    // Health is public
+    const hRes = await makeRequest(unconfiguredServer, { path: '/api/health', method: 'GET' });
+    assert.strictEqual(hRes.status, 200);
+
+    // Protected endpoints MUST fail closed (401) even if client sends header
+    const mRes = await makeRequest(unconfiguredServer, {
+      path: '/api/metrics',
+      method: 'GET',
+      headers: { 'X-Agent-Secret': 'some-guess' },
+    });
+    assert.strictEqual(mRes.status, 401);
+
+    const mResEmpty = await makeRequest(unconfiguredServer, {
+      path: '/api/metrics',
+      method: 'GET',
+      headers: { 'X-Agent-Secret': '' },
+    });
+    assert.strictEqual(mResEmpty.status, 401);
+  } finally {
+    unconfiguredServer.close();
+  }
+
+  // 15. Unit tests for checkAgentAuth (constant-time & fail-closed)
+  assert.strictEqual(checkAgentAuth({ headers: {} }, ''), false);
+  assert.strictEqual(checkAgentAuth({ headers: {} }, null), false);
+  assert.strictEqual(checkAgentAuth({ headers: { 'x-agent-secret': 'foo' } }, ''), false);
+  assert.strictEqual(checkAgentAuth({ headers: {} }, 'my-secret'), false);
+  assert.strictEqual(checkAgentAuth({ headers: { 'x-agent-secret': 'wrong' } }, 'my-secret'), false);
+  assert.strictEqual(checkAgentAuth({ headers: { 'x-agent-secret': 'my-secret' } }, 'my-secret'), true);
+
+  // 16. Socket error handling in parseJsonBody and parseBufferBody
+  const fakeJsonReq = new EventEmitter();
+  const jsonPromise = parseJsonBody(fakeJsonReq);
+  fakeJsonReq.emit('error', new Error('ECONNRESET in json stream'));
+  await assert.rejects(jsonPromise, /ECONNRESET in json stream/);
+
+  const fakeBufReq = new EventEmitter();
+  const bufPromise = parseBufferBody(fakeBufReq);
+  fakeBufReq.emit('error', new Error('ECONNRESET in buf stream'));
+  await assert.rejects(bufPromise, /ECONNRESET in buf stream/);
+
+  console.log('✅ worker agent hardening tests passed');
 }
 
 runTests().catch((err) => {

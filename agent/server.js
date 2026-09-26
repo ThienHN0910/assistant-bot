@@ -1,44 +1,97 @@
 const http = require('http');
+const crypto = require('crypto');
 const si = require('systeminformation');
 const agentSandbox = require('./agentSandbox');
+
+const DEFAULT_MAX_JSON_BYTES = 1024 * 1024; // 1MB
+const DEFAULT_MAX_ZIP_BYTES = 50 * 1024 * 1024; // 50MB
 
 function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(data));
 }
 
-function parseJsonBody(req) {
-  return new Promise((resolve) => {
+function parseJsonBody(req, maxBytes = DEFAULT_MAX_JSON_BYTES) {
+  return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', (chunk) => { body += chunk; });
+    let size = 0;
+    let exceeded = false;
+
+    req.on('data', (chunk) => {
+      if (exceeded) return;
+      size += chunk.length;
+      if (size > maxBytes) {
+        exceeded = true;
+        req.pause();
+        reject(new Error(`Payload exceeds maximum allowed size of ${maxBytes} bytes`));
+        return;
+      }
+      body += chunk;
+    });
+
     req.on('end', () => {
+      if (exceeded) return;
       try {
         resolve(body ? JSON.parse(body) : {});
       } catch {
         resolve({});
       }
     });
+
+    req.on('error', (err) => {
+      reject(err);
+    });
   });
 }
 
-function parseBufferBody(req) {
+function parseBufferBody(req, maxBytes = DEFAULT_MAX_ZIP_BYTES) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
+    let size = 0;
+    let exceeded = false;
+
+    req.on('data', (c) => {
+      if (exceeded) return;
+      size += c.length;
+      if (size > maxBytes) {
+        exceeded = true;
+        req.pause();
+        reject(new Error(`Payload exceeds maximum allowed size of ${maxBytes} bytes`));
+        return;
+      }
+      chunks.push(c);
+    });
+
+    req.on('end', () => {
+      if (exceeded) return;
+      resolve(Buffer.concat(chunks));
+    });
+
+    req.on('error', (err) => {
+      reject(err);
+    });
   });
 }
 
 function checkAgentAuth(req, expectedSecret) {
-  if (!expectedSecret) return true;
+  if (!expectedSecret || typeof expectedSecret !== 'string' || expectedSecret.trim() === '') {
+    return false; // Fail-closed when secret is missing or unset
+  }
   const provided = req.headers['x-agent-secret'];
-  return Boolean(provided && provided === expectedSecret);
+  if (!provided || typeof provided !== 'string') {
+    return false;
+  }
+  const hashA = crypto.createHash('sha256').update(provided).digest();
+  const hashB = crypto.createHash('sha256').update(expectedSecret).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }
 
 function createAgentServer(options = {}) {
-  const secret = options.secret || process.env.NODE_AGENT_SECRET || '';
+  const secret = (options.secret !== undefined) ? options.secret : (process.env.NODE_AGENT_SECRET || '');
   const sandbox = options.sandbox || agentSandbox;
+  const maxJsonBytes = options.maxJsonBytes || DEFAULT_MAX_JSON_BYTES;
+  const maxZipBytes = options.maxZipBytes || DEFAULT_MAX_ZIP_BYTES;
+
   const metricsProvider = options.metricsProvider || (async () => {
     const [cpu, mem, time] = await Promise.all([
       si.currentLoad().catch(() => ({ currentLoad: 0 })),
@@ -88,7 +141,7 @@ function createAgentServer(options = {}) {
           sendJson(res, 400, { ok: false, error: 'x-project-name header is required' });
           return;
         }
-        const zipBuffer = await parseBufferBody(req);
+        const zipBuffer = await parseBufferBody(req, maxZipBytes);
         if (!zipBuffer || zipBuffer.length === 0) {
           sendJson(res, 400, { ok: false, error: 'ZIP binary payload is empty' });
           return;
@@ -96,14 +149,15 @@ function createAgentServer(options = {}) {
         const deployRes = await sandbox.deployZipPayload(zipBuffer, projectName, subdomain);
         sendJson(res, 200, { ok: true, deployment: deployRes });
       } catch (err) {
-        sendJson(res, 500, { ok: false, error: err.message });
+        const isPayloadTooLarge = err.message && err.message.includes('maximum allowed size');
+        sendJson(res, isPayloadTooLarge ? 413 : 500, { ok: false, error: err.message });
       }
       return;
     }
 
     if (pathname === '/api/undeploy' && req.method === 'POST') {
       try {
-        const body = await parseJsonBody(req);
+        const body = await parseJsonBody(req, maxJsonBytes);
         const projectName = body.projectName || urlObj.searchParams.get('project');
         if (!projectName) {
           sendJson(res, 400, { ok: false, error: 'projectName is required' });
@@ -112,7 +166,8 @@ function createAgentServer(options = {}) {
         const result = await sandbox.removeProject(projectName);
         sendJson(res, 200, { ok: true, removed: result });
       } catch (err) {
-        sendJson(res, 500, { ok: false, error: err.message });
+        const isPayloadTooLarge = err.message && err.message.includes('maximum allowed size');
+        sendJson(res, isPayloadTooLarge ? 413 : 500, { ok: false, error: err.message });
       }
       return;
     }
@@ -148,4 +203,7 @@ if (require.main === module) {
 
 module.exports = {
   createAgentServer,
+  checkAgentAuth,
+  parseJsonBody,
+  parseBufferBody,
 };
