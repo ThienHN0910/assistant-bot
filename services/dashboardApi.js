@@ -136,7 +136,13 @@ function createDashboardServer(config, deps = {}) {
             };
             const contentType = mimeMap[ext] || 'application/octet-stream';
             const content = await fs.readFile(targetPath);
-            res.writeHead(200, { 'Content-Type': contentType });
+            const headers = { 'Content-Type': contentType };
+            if (ext === '.html') {
+              headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+            } else if (ext === '.js' || ext === '.css') {
+              headers['Cache-Control'] = 'public, max-age=60, must-revalidate';
+            }
+            res.writeHead(200, headers);
             res.end(content);
             return;
           }
@@ -154,7 +160,10 @@ function createDashboardServer(config, deps = {}) {
       const indexPath = path.resolve(dashboardDir, 'index.html');
       try {
         const indexContent = await fs.readFile(indexPath);
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        });
         res.end(indexContent);
         return;
       } catch {
