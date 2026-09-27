@@ -114,6 +114,23 @@ function createDashboardServer(config, deps = {}) {
 
     // 0. Serve Dashboard UI static files and SPA fallback (public)
     if (req.method === 'GET' && !pathname.startsWith('/api/')) {
+      // Normalize common sitemap / robots misconfigurations & aliases
+      if (pathname === '/sitemap' || pathname === '/sitemap/') {
+        res.writeHead(301, { Location: '/sitemap.xml' });
+        res.end();
+        return;
+      }
+      if (pathname.endsWith('/sitemap.xml') && pathname !== '/sitemap.xml') {
+        res.writeHead(301, { Location: '/sitemap.xml' });
+        res.end();
+        return;
+      }
+      if (pathname.endsWith('/robots.txt') && pathname !== '/robots.txt') {
+        res.writeHead(301, { Location: '/robots.txt' });
+        res.end();
+        return;
+      }
+
       const safePath = pathname === '/' ? '/index.html' : pathname;
       const dashboardDir = path.resolve(__dirname, '../dashboard');
       const targetPath = path.resolve(dashboardDir, '.' + safePath);
