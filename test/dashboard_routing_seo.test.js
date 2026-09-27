@@ -45,7 +45,23 @@ async function testDashboardRoutingAndSeo() {
     assert(sitemapRes.data.includes('<urlset'), 'sitemap.xml must have urlset root');
     assert(sitemapRes.data.includes('https://bot.thienhn.io.vn/'), 'sitemap.xml must contain base URL');
     assert(sitemapRes.data.includes('https://bot.thienhn.io.vn/commands'), 'sitemap.xml must contain /commands URL');
+    assert(sitemapRes.data.includes('<lastmod>'), 'sitemap.xml must contain lastmod tags');
     console.log('✅ GET /sitemap.xml test passed');
+
+    // 2.1 Test sitemap normalization redirects
+    const clientNoRedirect = axios.create({
+      baseURL: `http://127.0.0.1:${port}`,
+      maxRedirects: 0,
+      validateStatus: () => true,
+    });
+    const sitemapAliasRes = await clientNoRedirect.get('/sitemap');
+    assert.strictEqual(sitemapAliasRes.status, 301, '/sitemap should redirect 301 to /sitemap.xml');
+    assert.strictEqual(sitemapAliasRes.headers.location, '/sitemap.xml');
+
+    const sitemapDuplicatePrefixRes = await clientNoRedirect.get('/https://bot.thienhn.io.vn/sitemap.xml');
+    assert.strictEqual(sitemapDuplicatePrefixRes.status, 301, 'duplicated sitemap url should redirect 301 to /sitemap.xml');
+    assert.strictEqual(sitemapDuplicatePrefixRes.headers.location, '/sitemap.xml');
+    console.log('✅ Sitemap 301 alias and prefix redirects test passed');
 
     // 3. SPA Fallback tests for HTML5 History API routes
     const routesToTest = [
