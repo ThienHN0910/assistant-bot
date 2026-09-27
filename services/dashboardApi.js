@@ -112,7 +112,7 @@ function createDashboardServer(config, deps = {}) {
     const urlObj = new URL(req.url, 'http://localhost');
     const pathname = urlObj.pathname;
 
-    // 0. Serve Dashboard UI static files (public)
+    // 0. Serve Dashboard UI static files and SPA fallback (public)
     if (req.method === 'GET' && !pathname.startsWith('/api/')) {
       const safePath = pathname === '/' ? '/index.html' : pathname;
       const dashboardDir = path.resolve(__dirname, '../dashboard');
@@ -131,6 +131,8 @@ function createDashboardServer(config, deps = {}) {
               '.png': 'image/png',
               '.ico': 'image/x-icon',
               '.svg': 'image/svg+xml',
+              '.xml': 'application/xml; charset=utf-8',
+              '.txt': 'text/plain; charset=utf-8',
             };
             const contentType = mimeMap[ext] || 'application/octet-stream';
             const content = await fs.readFile(targetPath);
@@ -140,7 +142,22 @@ function createDashboardServer(config, deps = {}) {
           }
         } catch {}
       }
-      if (pathname === '/' || pathname === '/index.html') {
+
+      // If a specific file with extension was requested but not found, return 404
+      const fileExt = path.extname(pathname);
+      if (fileExt && pathname !== '/index.html') {
+        sendJson(res, 404, { ok: false, error: 'Static file not found' });
+        return;
+      }
+
+      // SPA Fallback: serve index.html for clean HTML5 history routes
+      const indexPath = path.resolve(dashboardDir, 'index.html');
+      try {
+        const indexContent = await fs.readFile(indexPath);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(indexContent);
+        return;
+      } catch {
         sendJson(res, 500, { ok: false, error: 'Dashboard UI HTML file not found' });
         return;
       }

@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /commands
+Allow: /features
+Allow: /architecture
+Allow: /cluster
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /dashboard/*
+
+Sitemap: https://bot.thienhn.io.vn/sitemap.xml
