@@ -375,6 +375,22 @@ NODE_ENV="production"
   ```bash
   curl -Iv https://bot.thienhn.io.vn/ | grep -i strict-transport-security
   ```
+- **SPA Fallback & Routing (HTML5 History API + SEO Assets)**:
+  The dashboard implements HTML5 History API routing (`/dashboard`, `/commands`, `/features`, `/architecture`, `/sitemap.xml`, `/robots.txt`).
+  - When Nginx proxies to Node.js (:3001), `services/dashboardApi.js` handles SPA fallback internally (serving `index.html` for clean URLs) and serves `/robots.txt` (`text/plain`) and `/sitemap.xml` (`application/xml`).
+  - When Nginx serves static dashboard files directly, configure:
+    ```nginx
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    location /api/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    ```
 
 ### SOP 6: Incident Response & Troubleshooting
 

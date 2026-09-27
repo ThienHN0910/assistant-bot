@@ -12,7 +12,78 @@ const { createApp, ref, computed, onMounted } = Vue;
 
         // Navigation state: 'showcase' (Guest Landing Page) or 'dashboard' (Management Console)
         const currentTab = ref('showcase');
-        const dashTab = ref('telemetry'); // 'telemetry' | 'deployments' | 'commands'
+        const dashTab = ref('telemetry'); // 'telemetry' | 'deployments' | 'operations' | 'notes' | 'commands'
+
+        // Route titles for SEO & dynamic document.title
+        const ROUTE_TITLES = {
+          '/': 'DevOps Dashboard | Assistant Bot & Cloud Sandbox',
+          '/overview': 'Tổng quan | DevOps Dashboard & Cloud Sandbox',
+          '/features': 'Tính năng cốt lõi | DevOps Dashboard',
+          '/commands': 'Tra cứu lệnh Telegram | DevOps Dashboard',
+          '/architecture': 'Kiến trúc Hub & Spoke | DevOps Dashboard',
+          '/highlights': 'Điểm sáng Kỹ thuật | DevOps Dashboard',
+          '/cluster': 'Cụm máy chủ Multi-VPS | DevOps Dashboard',
+          '/dashboard': 'Bảng điều khiển Cluster | DevOps Dashboard',
+          '/dashboard/telemetry': 'Giám sát Cluster & Telemetry | DevOps Dashboard',
+          '/dashboard/deployments': 'Quản lý Dịch vụ Web | DevOps Dashboard',
+          '/dashboard/operations': 'Tác vụ & Safe Web Terminal | DevOps Dashboard',
+          '/dashboard/notes': 'Sổ tay Ghi chú | DevOps Dashboard',
+          '/dashboard/commands': 'Tra cứu Lệnh Quản trị | DevOps Dashboard',
+        };
+
+        function syncRouteFromUrl() {
+          if (typeof window === 'undefined') return;
+          const rawPath = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
+          if (rawPath.startsWith('/dashboard')) {
+            currentTab.value = 'dashboard';
+            if (rawPath === '/dashboard' || rawPath === '/dashboard/telemetry') {
+              dashTab.value = 'telemetry';
+            } else if (rawPath === '/dashboard/deployments') {
+              dashTab.value = 'deployments';
+            } else if (rawPath === '/dashboard/operations') {
+              dashTab.value = 'operations';
+            } else if (rawPath === '/dashboard/notes') {
+              dashTab.value = 'notes';
+              if (typeof fetchNotes === 'function') fetchNotes();
+            } else if (rawPath === '/dashboard/commands') {
+              dashTab.value = 'commands';
+            }
+            if (!isAuthenticated.value && !token.value) {
+              showLoginModal.value = true;
+            }
+          } else {
+            currentTab.value = 'showcase';
+            const section = rawPath.slice(1);
+            if (['overview', 'features', 'commands', 'architecture', 'highlights', 'cluster'].includes(section)) {
+              setTimeout(() => {
+                const el = document.getElementById(section);
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }, 50);
+            }
+          }
+          if (typeof document !== 'undefined') {
+            document.title = ROUTE_TITLES[rawPath] || ROUTE_TITLES['/'];
+          }
+        }
+
+        function navigate(targetPath, replace = false) {
+          if (typeof window === 'undefined') return;
+          const cleanPath = targetPath ? (targetPath.startsWith('/') ? targetPath : '/' + targetPath) : '/';
+          if (window.location.pathname !== cleanPath) {
+            if (replace) {
+              window.history.replaceState({ path: cleanPath }, '', cleanPath);
+            } else {
+              window.history.pushState({ path: cleanPath }, '', cleanPath);
+            }
+          }
+          syncRouteFromUrl();
+        }
+
+        function switchDashTab(tab) {
+          dashTab.value = tab;
+          if (tab === 'notes' && typeof fetchNotes === 'function') fetchNotes();
+          navigate('/dashboard/' + tab);
+        }
 
         // Dashboard Data
         const system = ref(null);
@@ -389,8 +460,12 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
               localStorage.setItem('dashboard_user', JSON.stringify(data.user));
               isAuthenticated.value = true;
               showLoginModal.value = false;
-              currentTab.value = 'dashboard';
               showToast(`Chào mừng trở lại, ${data.user.name}!`);
+              if (window.location.pathname.startsWith('/dashboard')) {
+                syncRouteFromUrl();
+              } else {
+                navigate('/dashboard/' + dashTab.value);
+              }
               fetchData();
             } else {
               authError.value = data.error || 'Đăng nhập Google thất bại';
@@ -432,9 +507,9 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           localStorage.removeItem('dashboard_session');
           localStorage.removeItem('dashboard_user');
           isAuthenticated.value = false;
-          currentTab.value = 'showcase';
           showToast('Đã đăng xuất khỏi Dashboard.');
           initGoogleAuth();
+          navigate('/', true);
         }
 
         // =====================================================================
@@ -1058,6 +1133,10 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
         }
 
         onMounted(() => {
+          if (typeof window !== 'undefined') {
+            window.addEventListener('popstate', syncRouteFromUrl);
+            syncRouteFromUrl();
+          }
           verifySession();
           initGoogleAuth();
           fetchNodes();
@@ -1076,6 +1155,9 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           openLoginModal,
           currentTab,
           dashTab,
+          navigate,
+          switchDashTab,
+          syncRouteFromUrl,
           system,
           clusterNodes,
           nodes,

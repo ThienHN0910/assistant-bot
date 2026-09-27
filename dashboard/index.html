@@ -11,7 +11,9 @@
   <meta name="description" content="DevOps Dashboard & Telegram Dev Assistant Suite cho lập trình viên. Tự động hóa quản trị VPS 1GB RAM, deploy 1 chạm lên VPS Nginx, Vercel, Render kèm tự động hóa Cloudflare DNS.">
   <meta name="keywords" content="DevOps, Telegram Bot, Cloudflare DNS, Vercel Deploy, Render Deploy, VPS GCP e2-micro, Nginx, Vue 3 Dashboard, Portfolio ThienHN, DevOps Orchestrator">
   <meta name="author" content="ThienHN">
+  <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://bot.thienhn.io.vn/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
@@ -91,7 +93,7 @@
     <header class="sticky top-0 z-40 bg-slate-950/85 backdrop-blur-md border-b border-slate-800">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         <!-- Logo & Branding -->
-        <a href="#overview" @click="currentTab = 'showcase'" class="flex items-center gap-3 group">
+        <a href="/" @click.prevent="navigate('/')" class="flex items-center gap-3 group">
           <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-xl shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform">
             🤖
           </div>
@@ -106,13 +108,13 @@
 
         <!-- Desktop Navigation Links -->
         <nav class="hidden md:flex items-center gap-1 text-sm font-medium text-slate-300">
-          <a href="#overview" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors">Tổng quan</a>
-          <a href="#architecture" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors">Kiến trúc</a>
-          <a href="#commands" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors flex items-center gap-1.5">
+          <a href="/overview" @click.prevent="navigate('/overview')" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors">Tổng quan</a>
+          <a href="/architecture" @click.prevent="navigate('/architecture')" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors">Kiến trúc</a>
+          <a href="/commands" @click.prevent="navigate('/commands')" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors flex items-center gap-1.5">
             <span>Danh mục Lệnh</span>
             <span class="text-xs px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">{{ commands.length }}</span>
           </a>
-          <a href="#highlights" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors">Điểm sáng Kỹ thuật</a>
+          <a href="/highlights" @click.prevent="navigate('/highlights')" class="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-900 transition-colors">Điểm sáng Kỹ thuật</a>
           <a href="https://thienhn.io.vn/" target="_blank" class="px-3 py-1.5 rounded-lg text-brand-400 hover:text-brand-300 flex items-center gap-1">
             <span>Portfolio</span>
             <span class="text-xs">↗</span>
@@ -124,7 +126,7 @@
           <!-- When Logged In -->
           <template v-if="isAuthenticated">
             <button 
-              @click="currentTab = (currentTab === 'showcase' ? 'dashboard' : 'showcase')"
+              @click="navigate(currentTab === 'showcase' ? ('/dashboard/' + dashTab) : '/')"
               class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-xs sm:text-sm font-medium transition-all flex items-center gap-2">
               <span v-if="currentTab === 'showcase'">📊 Vào Dashboard</span>
               <span v-else>👁️ Xem Landing Page</span>
@@ -190,11 +192,11 @@
 
           <!-- Action Buttons -->
           <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <a href="#commands" class="px-6 py-3 rounded-2xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-sm transition-all shadow-xl shadow-brand-500/25 flex items-center gap-2">
+            <a href="/commands" @click.prevent="navigate('/commands')" class="px-6 py-3 rounded-2xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-sm transition-all shadow-xl shadow-brand-500/25 flex items-center gap-2">
               <span>📋</span>
               <span>Khám phá 16 Lệnh Telegram</span>
             </a>
-            <a href="#architecture" class="px-6 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center gap-2">
+            <a href="/architecture" @click.prevent="navigate('/architecture')" class="px-6 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center gap-2">
               <span>🏗️</span>
               <span>Xem Kiến trúc Hệ thống</span>
             </a>
@@ -610,7 +612,7 @@
       <!-- DASHBOARD TABS SWITCHER -->
       <div class="flex items-center gap-2 border-b border-slate-800 pb-3 text-sm overflow-x-auto">
         <button 
-          @click="dashTab = 'telemetry'"
+          @click="switchDashTab('telemetry')"
           :class="dashTab === 'telemetry' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
           class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 whitespace-nowrap">
           <span>🖥️</span>
@@ -618,7 +620,7 @@
         </button>
 
         <button 
-          @click="dashTab = 'deployments'"
+          @click="switchDashTab('deployments')"
           :class="dashTab === 'deployments' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
           class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 whitespace-nowrap">
           <span>🌐</span>
@@ -627,7 +629,7 @@
         </button>
 
         <button 
-          @click="dashTab = 'operations'"
+          @click="switchDashTab('operations')"
           :class="dashTab === 'operations' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
           class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 whitespace-nowrap">
           <span>⚙️</span>
@@ -635,7 +637,7 @@
         </button>
 
         <button 
-          @click="dashTab = 'notes'; fetchNotes()"
+          @click="switchDashTab('notes')"
           :class="dashTab === 'notes' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
           class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 whitespace-nowrap">
           <span>📝</span>
@@ -644,7 +646,7 @@
         </button>
 
         <button 
-          @click="dashTab = 'commands'"
+          @click="switchDashTab('commands')"
           :class="dashTab === 'commands' ? 'bg-brand-600 text-white shadow-md' : 'text-slate-400 hover:text-white bg-slate-900 border border-slate-800'"
           class="px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 whitespace-nowrap">
           <span>📋</span>
