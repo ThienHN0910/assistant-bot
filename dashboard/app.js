@@ -1,4 +1,5 @@
-const { createApp, ref, computed, onMounted } = Vue;
+(function () {
+  const { createApp, ref, computed, onMounted } = Vue;
 
     createApp({
       setup() {
@@ -1248,3 +1249,4 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
         };
       }
     }).mount('#app');
+})();
