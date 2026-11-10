@@ -1,5 +1,5 @@
 (function () {
-  const { createApp, ref, computed, onMounted } = Vue;
+  const { createApp, ref, computed, onMounted, onBeforeUnmount } = Vue;
 
     createApp({
       setup() {
@@ -14,6 +14,7 @@
         // Navigation state: 'showcase' (Guest Landing Page) or 'dashboard' (Management Console)
         const currentTab = ref('showcase');
         const dashTab = ref('telemetry'); // 'telemetry' | 'deployments' | 'operations' | 'notes' | 'commands'
+        const mobileNavOpen = ref(false);
 
         // Route titles for SEO & dynamic document.title
         const ROUTE_TITLES = {
@@ -68,6 +69,7 @@
         }
 
         function navigate(targetPath, replace = false) {
+          mobileNavOpen.value = false;
           if (typeof window === 'undefined') return;
           const cleanPath = targetPath ? (targetPath.startsWith('/') ? targetPath : '/' + targetPath) : '/';
           if (window.location.pathname !== cleanPath) {
@@ -92,6 +94,7 @@
         const nodes = ref([]);
         const deployments = ref([]);
         const refreshing = ref(false);
+        const deploymentsLoaded = ref(false);
         const targetFilter = ref('all');
         const searchQuery = ref('');
 
@@ -513,6 +516,8 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           localStorage.removeItem('dashboard_session');
           localStorage.removeItem('dashboard_user');
           isAuthenticated.value = false;
+          deploymentsLoaded.value = false;
+          mobileNavOpen.value = false;
           showToast('Đã đăng xuất khỏi Dashboard.');
           initGoogleAuth();
           navigate('/', true);
@@ -555,6 +560,7 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
             showToast(err.message, 'error');
           } finally {
             refreshing.value = false;
+            deploymentsLoaded.value = true;
           }
         }
 
@@ -1138,9 +1144,21 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           }
         }
 
+        function handleKeydown(e) {
+          if (e.key === 'Escape' || e.key === 'Esc') {
+            showLoginModal.value = false;
+            showDeployModal.value = false;
+            showProcessesModal.value = false;
+            showLogsModal.value = false;
+            showPerfModal.value = false;
+            showUndeployModal.value = false;
+          }
+        }
+
         onMounted(() => {
           if (typeof window !== 'undefined') {
             window.addEventListener('popstate', syncRouteFromUrl);
+            window.addEventListener('keydown', handleKeydown);
             syncRouteFromUrl();
           }
           verifySession();
@@ -1150,7 +1168,16 @@ Sử dụng các nút bấm bên dưới hoặc gõ lệnh để thao tác.`,
           fetchNotes();
         });
 
+        onBeforeUnmount(() => {
+          if (typeof window !== 'undefined') {
+            window.removeEventListener('popstate', syncRouteFromUrl);
+            window.removeEventListener('keydown', handleKeydown);
+          }
+        });
+
         return {
+          mobileNavOpen,
+          deploymentsLoaded,
           token,
           user,
           isAuthenticated,
