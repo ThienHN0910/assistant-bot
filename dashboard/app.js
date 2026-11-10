@@ -105,9 +105,14 @@
         // Copy feedback
         const copiedCommand = ref('');
         function copyCommand(text) {
-          navigator.clipboard.writeText(text);
-          copiedCommand.value = text;
-          showToast(`Đã sao chép lệnh: ${text}`);
+          if (!navigator.clipboard?.writeText) {
+            showToast('Trình duyệt không hỗ trợ sao chép tự động', 'error');
+            return;
+          }
+          navigator.clipboard.writeText(text).then(() => {
+            copiedCommand.value = text;
+            showToast(`Đã sao chép lệnh: ${text}`);
+          }).catch(() => showToast('Không thể sao chép, hãy copy thủ công', 'error'));
           setTimeout(() => { copiedCommand.value = ''; }, 2500);
         }
 

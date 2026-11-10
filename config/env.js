@@ -46,10 +46,13 @@ function getConfig() {
   const vercelToken = (process.env.VERCEL_TOKEN || '').trim();
   const renderApiKey = (process.env.RENDER_API_KEY || '').trim();
   const renderOwnerId = (process.env.RENDER_OWNER_ID || '').trim();
+  // Vercel/Render stay gated until origin readiness is verified; opt in with CLOUD_TARGETS_READY=true.
+  const cloudTargetsReady = process.env.CLOUD_TARGETS_READY === 'true';
   const deployRegistryPath = toAbsolutePath(process.env.DEPLOY_REGISTRY_PATH || './data/deployments.json');
   // Cấu hình Web Dashboard (Đăng nhập Google OAuth 2.0 độc quyền)
   const googleClientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
-  const authorizedGoogleEmail = (process.env.AUTHORIZED_GOOGLE_EMAIL || '').trim().toLowerCase();
+  // ADMIN_EMAIL is accepted as an alias so all personal projects share one variable name.
+  const authorizedGoogleEmail = (process.env.AUTHORIZED_GOOGLE_EMAIL || process.env.ADMIN_EMAIL || '').trim().toLowerCase();
   const sessionSecret = (process.env.SESSION_SECRET || '').trim();
   const dashboardAllowedOrigin = (process.env.DASHBOARD_ALLOWED_ORIGIN || '').trim();
   const dashboardPort = Number(process.env.DASHBOARD_PORT) || 3001;
@@ -81,6 +84,7 @@ function getConfig() {
     renderApiKey,
     renderOwnerId,
     deployRegistryPath,
+    cloudTargetsReady,
     googleClientId,
     authorizedGoogleEmail,
     sessionSecret,

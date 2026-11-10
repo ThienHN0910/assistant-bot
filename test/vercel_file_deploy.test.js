@@ -1,4 +1,5 @@
 const assert = require('assert');
+const TAR_BIN = require('../config/utils').tarBinary();
 const path = require('path');
 const fs = require('fs/promises');
 const os = require('os');
@@ -19,7 +20,7 @@ async function testVercelFileDeploy() {
 
   // Create zip file
   if (process.platform === 'win32') {
-    await execFileAsync('tar', ['-cf', zipPath, '-C', sourceFolder, '.']);
+    await execFileAsync(TAR_BIN, ['-cf', zipPath, '-C', sourceFolder, '.']);
   } else {
     await execFileAsync('zip', ['-r', zipPath, '.'], { cwd: sourceFolder });
   }

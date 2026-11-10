@@ -1,4 +1,5 @@
 const fs = require('fs/promises');
+const { formatNoteLine } = require('../../config/utils');
 
 async function handleGetNotes(req, res, { config, sendJson }) {
   try {
@@ -30,9 +31,7 @@ async function handleCreateNote(req, res, { config, sendJson, parseJsonBody }) {
     }
 
     const notesPath = config?.notesFilePath || './notes.txt';
-    const timestamp = new Date().toLocaleString('vi-VN', { hour12: false });
-    const line = `[${timestamp}] ${text}\n`;
-    await fs.appendFile(notesPath, line, 'utf8');
+    await fs.appendFile(notesPath, formatNoteLine(text, config?.timezone), 'utf8');
 
     sendJson(res, 200, { ok: true, message: 'Đã lưu ghi chú thành công' });
   } catch (err) {

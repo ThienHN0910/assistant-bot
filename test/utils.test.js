@@ -1,7 +1,7 @@
 const assert = require('assert');
 const fs = require('fs/promises');
 const path = require('path');
-const { readLastLines, escapeHtml } = require('../config/utils');
+const { readLastLines, escapeHtml, buildStepOutput, formatNoteLine, zipExtractCommand } = require('../config/utils');
 
 async function testReadLastLines() {
   const tempFile = path.join(__dirname, 'test_temp_log.txt');
@@ -27,8 +27,34 @@ function testEscapeHtml() {
   console.log('✅ escapeHtml test passed');
 }
 
+function testBuildStepOutput() {
+  const out = buildStepOutput({ cmd: 'git', args: ['pull'] }, { ok: false, stdout: 'a\n', stderr: 'b', code: 1 });
+  const expected = ['Lệnh: git pull', 'Trạng thái: Thất bại', '', 'stdout:', 'a', '', 'stderr:', 'b', '', 'exit code: 1'];
+  assert.strictEqual(out, expected.join('\n'));
+  console.log('✅ buildStepOutput test passed');
+}
+
+function testFormatNoteLine() {
+  // 2026-01-01T00:30Z is 07:30 in Asia/Ho_Chi_Minh, regardless of the server's own timezone
+  const line = formatNoteLine('hello', 'Asia/Ho_Chi_Minh', new Date('2026-01-01T00:30:00Z'));
+  assert.ok(line.includes('07:30'), `expected local time in ${line}`);
+  assert.ok(line.endsWith('] hello\n'));
+  console.log('✅ formatNoteLine test passed');
+}
+
+function testZipExtractCommand() {
+  assert.deepStrictEqual(zipExtractCommand('a.zip', 'out', 'linux'), ['unzip', ['-o', 'a.zip', '-d', 'out']]);
+  const [bin, args] = zipExtractCommand('a.zip', 'out', 'win32');
+  assert.ok(/System32[\\/]tar\.exe$/i.test(bin), bin);
+  assert.deepStrictEqual(args, ['-xf', 'a.zip', '-C', 'out']);
+  console.log('✅ zipExtractCommand test passed');
+}
+
 async function run() {
   testEscapeHtml();
+  testBuildStepOutput();
+  testFormatNoteLine();
+  testZipExtractCommand();
   await testReadLastLines();
 }
 
