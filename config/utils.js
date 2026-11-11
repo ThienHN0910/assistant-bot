@@ -83,8 +83,50 @@ function formatPercent(value) {
   return `${Number(value).toFixed(2)}%`;
 }
 
+/**
+ * tar binary to use. On Windows the System32 bsdtar is used explicitly: Git's GNU tar
+ * (often first on PATH) treats "C:\\..." as a remote host.
+ */
+function tarBinary(platform = process.platform) {
+  if (platform !== 'win32') return 'tar';
+  return require('path').join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+}
+
+/** Command that unpacks a ZIP into a directory (bsdtar on Windows, unzip elsewhere). */
+function zipExtractCommand(zipFilePath, targetDir, platform = process.platform) {
+  if (platform === 'win32') return [tarBinary(platform), ['-xf', zipFilePath, '-C', targetDir]];
+  return ['unzip', ['-o', zipFilePath, '-d', targetDir]];
+}
+
+/** Plain-text report of one whitelisted shell step (shared by /sh and /update). */
+function buildStepOutput(step, res) {
+  const parts = [];
+  parts.push(`Lệnh: ${step.cmd} ${(step.args || []).join(' ')}`.trim());
+  parts.push(`Trạng thái: ${res.ok ? 'Thành công' : 'Thất bại'}`);
+  if (res.stdout) {
+    parts.push('', 'stdout:', res.stdout.trimEnd());
+  }
+  if (res.stderr) {
+    parts.push('', 'stderr:', res.stderr.trimEnd());
+  }
+  if (typeof res.code !== 'undefined') {
+    parts.push('', `exit code: ${res.code}`);
+  }
+  return parts.join('\n');
+}
+
+/** One notes.txt line; Telegram and Dashboard must stamp notes in the same timezone. */
+function formatNoteLine(text, timezone = 'Asia/Ho_Chi_Minh', now = new Date()) {
+  const timestamp = now.toLocaleString('vi-VN', { timeZone: timezone, hour12: false });
+  return `[${timestamp}] ${text}\n`;
+}
+
 module.exports = {
   escapeHtml,
+  buildStepOutput,
+  tarBinary,
+  zipExtractCommand,
+  formatNoteLine,
   readLastLines,
   formatBytes,
   formatFileSize,

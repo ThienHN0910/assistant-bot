@@ -147,8 +147,62 @@
               <span>Đăng nhập Quản trị</span>
             </button>
           </template>
+
+          <!-- Mobile Hamburger Button (visible below md) -->
+          <button 
+            type="button"
+            @click="mobileNavOpen = !mobileNavOpen"
+            class="md:hidden p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors flex items-center justify-center"
+            aria-label="Mở menu"
+            :aria-expanded="mobileNavOpen">
+            <svg v-if="!mobileNavOpen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+            <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
         </div>
       </div>
+
+      <!-- Mobile Navigation Dropdown -->
+      <nav 
+        v-show="mobileNavOpen" 
+        class="md:hidden border-t border-slate-800 bg-slate-950/95 backdrop-blur-md px-4 py-3 space-y-1">
+        <a 
+          href="/overview" 
+          @click.prevent="navigate('/overview'); mobileNavOpen = false" 
+          class="block px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-900 transition-colors">
+          Tổng quan
+        </a>
+        <a 
+          href="/architecture" 
+          @click.prevent="navigate('/architecture'); mobileNavOpen = false" 
+          class="block px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-900 transition-colors">
+          Kiến trúc
+        </a>
+        <a 
+          href="/commands" 
+          @click.prevent="navigate('/commands'); mobileNavOpen = false" 
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-900 transition-colors">
+          <span>Danh mục Lệnh</span>
+          <span class="text-xs px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">{{ commands.length }}</span>
+        </a>
+        <a 
+          href="/highlights" 
+          @click.prevent="navigate('/highlights'); mobileNavOpen = false" 
+          class="block px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-900 transition-colors">
+          Điểm sáng Kỹ thuật
+        </a>
+        <a 
+          href="https://thienhn.io.vn/" 
+          target="_blank" 
+          @click="mobileNavOpen = false"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-brand-400 hover:text-brand-300 hover:bg-slate-900 transition-colors">
+          <span>Portfolio</span>
+          <span class="text-xs">↗</span>
+        </a>
+      </nav>
     </header>
 
     <!-- ===================================================================== -->
@@ -895,6 +949,12 @@
         </div>
       </section>
 
+      <!-- TELEMETRY LOADING STATE FALLBACK -->
+      <section v-else-if="dashTab === 'telemetry'" class="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center shadow-xl flex flex-col items-center justify-center gap-4">
+        <div class="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-400 rounded-full animate-spin"></div>
+        <p class="text-sm text-slate-400 font-medium">Đang tải dữ liệu máy chủ...</p>
+      </section>
+
       <!-- TAB 2: DEPLOYMENTS TABLE -->
       <section v-if="dashTab === 'deployments'" class="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
         <div class="p-6 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -938,7 +998,13 @@
             <tbody class="divide-y divide-slate-800">
               <tr v-if="filteredDeployments.length === 0">
                 <td colspan="7" class="px-6 py-12 text-center text-slate-500">
-                  Chưa có dịch vụ nào phù hợp với bộ lọc tìm kiếm.
+                  <div v-if="!deploymentsLoaded" class="flex items-center justify-center gap-2">
+                    <span class="w-4 h-4 border-2 border-emerald-500/20 border-t-emerald-400 rounded-full animate-spin"></span>
+                    <span>Đang tải danh sách dịch vụ...</span>
+                  </div>
+                  <div v-else>
+                    Chưa có dịch vụ nào phù hợp với bộ lọc tìm kiếm.
+                  </div>
                 </td>
               </tr>
               <tr v-for="dep in filteredDeployments" :key="dep.id || dep.name" class="hover:bg-slate-800/40 transition-colors">
@@ -1336,6 +1402,7 @@
       <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center relative">
         <button 
           @click="showLoginModal = false" 
+          aria-label="Đóng"
           class="absolute top-5 right-5 text-slate-400 hover:text-white p-2 rounded-xl bg-slate-950 border border-slate-800">
           ✕
         </button>
@@ -1386,7 +1453,7 @@
             <span class="text-2xl">🐙</span>
             <h3 class="text-lg font-bold text-white">Triển Khai Dự Án Từ GitHub</h3>
           </div>
-          <button @click="closeDeployModal" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
+          <button @click="closeDeployModal" aria-label="Đóng" class="text-slate-400 hover:text-white p-1 rounded-lg">✕</button>
         </div>
 
         <div class="space-y-4">
@@ -1557,7 +1624,7 @@
             <button @click="fetchProcesses" :disabled="loadingProcesses" class="p-2 bg-slate-950 hover:bg-slate-800 text-slate-300 rounded-xl text-xs border border-slate-800">
               <span :class="{ 'animate-spin': loadingProcesses }">🔄</span>
             </button>
-            <button @click="showProcessesModal = false" class="text-slate-400 hover:text-white p-2">✕</button>
+            <button @click="showProcessesModal = false" aria-label="Đóng" class="text-slate-400 hover:text-white p-2">✕</button>
           </div>
         </div>
 
@@ -1615,7 +1682,7 @@
             <button @click="fetchLogs" :disabled="loadingLogs" class="p-2 bg-slate-950 hover:bg-slate-800 text-slate-300 rounded-xl text-xs border border-slate-800">
               <span :class="{ 'animate-spin': loadingLogs }">🔄</span>
             </button>
-            <button @click="showLogsModal = false" class="text-slate-400 hover:text-white p-2">✕</button>
+            <button @click="showLogsModal = false" aria-label="Đóng" class="text-slate-400 hover:text-white p-2">✕</button>
           </div>
         </div>
 
@@ -1639,7 +1706,7 @@
               <p class="text-xs text-slate-400 font-mono">{{ perfTarget }}</p>
             </div>
           </div>
-          <button @click="showPerfModal = false" class="text-slate-400 hover:text-white p-2">✕</button>
+          <button @click="showPerfModal = false" aria-label="Đóng" class="text-slate-400 hover:text-white p-2">✕</button>
         </div>
 
         <div class="mt-6 space-y-4">
@@ -1753,6 +1820,6 @@
   </div>
 
   <!-- MODULAR VUE 3 APPLICATION SCRIPT -->
-  <script src="/app.js?v=2.2.0"></script>
+  <script src="/app.js?v=2.3.0"></script>
 </body>
 </html>

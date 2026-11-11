@@ -1,4 +1,4 @@
-const { escapeHtml } = require('../config/utils');
+const { escapeHtml, buildStepOutput } = require('../config/utils');
 const whitelist = require('../lib/whitelist');
 const runner = require('../lib/runner');
 const nodeManager = require('../lib/nodeManager');
@@ -10,26 +10,6 @@ function extractShellCommand(ctx) {
   return parts;
 }
 
-function buildStepOutput(step, res) {
-  const parts = [];
-  parts.push(`Lệnh: ${step.cmd} ${ (step.args || []).join(' ') }`.trim());
-  parts.push(`Trạng thái: ${res.ok ? 'Thành công' : 'Thất bại'}`);
-  if (res.stdout) {
-    parts.push('');
-    parts.push('stdout:');
-    parts.push(res.stdout.trimEnd());
-  }
-  if (res.stderr) {
-    parts.push('');
-    parts.push('stderr:');
-    parts.push(res.stderr.trimEnd());
-  }
-  if (typeof res.code !== 'undefined') {
-    parts.push('');
-    parts.push(`exit code: ${res.code}`);
-  }
-  return parts.join('\n');
-}
 
 module.exports = {
   name: 'sh',

@@ -1,6 +1,6 @@
 const fs = require('fs/promises');
 const deployer = require('../lib/deployer');
-const { escapeHtml } = require('../config/utils');
+const { escapeHtml, formatNoteLine } = require('../config/utils');
 const deployStore = require('../lib/deployStore');
 
 const repoInspector = require('../lib/repoInspector');
@@ -210,13 +210,7 @@ function createTextHandler(config, deps = {}) {
       }
 
       // 3. Text ghi chú cá nhân thông thường
-      const timestamp = new Date().toLocaleString('vi-VN', {
-        timeZone: config.timezone,
-        hour12: false,
-      });
-
-      const line = `[${timestamp}] ${text}\n`;
-      await fs.appendFile(config.notesFilePath, line, 'utf8');
+      await fs.appendFile(config.notesFilePath, formatNoteLine(text, config.timezone), 'utf8');
 
       await ctx.reply('✅ Đã lưu ghi chú thành công!');
     } catch (error) {

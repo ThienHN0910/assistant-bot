@@ -1,4 +1,5 @@
 const assert = require('assert');
+const TAR_BIN = require('../config/utils').tarBinary();
 const fs = require('fs/promises');
 const path = require('path');
 const sandbox = require('../lib/sandbox');
@@ -173,7 +174,7 @@ async function testSandbox() {
     const { promisify } = require('util');
     const execFileAsync = promisify(execFile);
     if (process.platform === 'win32') {
-      await execFileAsync('tar', ['-cf', githubZipPath, '-C', wrapperZipDir, '.']);
+      await execFileAsync(TAR_BIN, ['-cf', githubZipPath, '-C', wrapperZipDir, '.']);
     } else {
       await execFileAsync('zip', ['-r', githubZipPath, '.'], { cwd: wrapperZipDir });
     }
